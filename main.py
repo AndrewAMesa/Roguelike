@@ -38,11 +38,6 @@ class main():
     height = 0
     width = 0
 
-    #Boolean Values
-    playable = True
-    createdBoard = False
-    restarted = False
-    player1Lost = False
 
     #Board Config
     minXLength = 3
