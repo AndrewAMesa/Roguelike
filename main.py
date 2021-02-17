@@ -12,6 +12,7 @@ class centerInfo():
         self.array = _currentArray
 class tile(Sprite):
     def __init__(self, _BOXSIZE, _left, _top, _image, _x, _y):
+        pygame.sprite.Sprite.__init__(self)
         Sprite.__init__(self)
         self.BOXSIZE = _BOXSIZE
         self.left = _left
@@ -21,26 +22,27 @@ class tile(Sprite):
         self.isWall = False
         self.isRoom = False
         self.image = _image
+        self.rect = self.image.get_rect()
+        self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
         self.x = _x
         self.y = _y
     def drawTile(self, DISPLAYSURF):
         self.TILESURF.blit(self.image, (0,0))
         self.TILESURF.set_colorkey((255, 255, 255))
         DISPLAYSURF.blit(self.TILESURF, (self.left, self.top))
-class playerObjet(Sprite):
+class Player(Sprite):
     def __init__(self, _BOXSIZE, _left, _top, _image):
-        Sprite.__init__(self)
+        pygame.sprite.Sprite.__init__(self)
         self.BOXSIZE = _BOXSIZE
         self.left = _left
         self.top = _top
         self.TILESURF = pygame.Surface((self.BOXSIZE, self.BOXSIZE))
-        self.isFloor = False
-        self.isWall = False
         self.image = _image
-    def drawPlayer(self, DISPLAYSURF):
-        self.TILESURF.blit(self.image, (0,0))
-        self.TILESURF.set_colorkey((255, 255, 255))
-        DISPLAYSURF.blit(self.TILESURF, (self.left, self.top))
+        self.rect = self.image.get_rect()
+        self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
+    def movePlayer(self, x, y):
+        self.rect.x = self.rect.x + x
+        self.rect.y = self.rect.y + y
 class main():
     DISPLAYWIDTH = 16
     DISPLAYHEIGHT = 12
@@ -88,6 +90,10 @@ class main():
     chanceOfDoubleHallway = 3
     roomGap = 2
 
+    #SpriteGroups
+    playerSprite = pygame.sprite
+    playerGroup = pygame.sprite.Group()
+    backgroundGroup = pygame.sprite.Group()
 
     #Images
     Floor = pygame.image.load("images/TestFloor.png")
@@ -135,21 +141,8 @@ class main():
                         if event.key == pygame.K_LSHIFT:
                             self.sprinting = False
                             self.speed = .5
-            if self.canGoUp == True:
-                self.playerY -= self.speed
-            if self.canGoLeft == True:
-                self.playerX -= self.speed
-            if self.canGoDown == True:
-                self.playerY += self.speed
-            if self.canGoRight == True:
-                self.playerX += self.speed
-            if self.milliseconds > 80 and self.sprinting == True:
-                self.speed = .5
-                self.canSprint = False
-                self.milliseconds = 0
-                self.sprinting = False
-            if self.milliseconds > 300 and self.canSprint == False:
-                self.canSprint = True
+
+            self.move()
             #Updating board
             if self.playable == True:
                 self.drawBoard()
@@ -167,14 +160,12 @@ class main():
                 tempLeft += self.TILESIZE
                 self.tileList[y][x] = tile(self.TILESIZE, tempLeft, tempTop, self.Wall, x, y)
                 self.tileList[y][x].isWall = True
-                self.boardSprites = tile(self.TILESIZE, tempLeft, tempTop, self.Wall, x, y)
         while True:
             roomAmount = int ((random.random()* self.roomNumberMax) + 1)
             if roomAmount >= self.roomNumberMin and roomAmount <= self.roomNumberMax:
                 break
         tempNumber = 0
         while roomAmount > 0:
-            print("room" + str(roomAmount))
             while True:
                 xStart = int((random.random()* (self.BOARDWIDTH - self.maxXlength - self.borderWidth)))
                 if xStart > self.borderWidth + 1 and xStart < self.BOARDWIDTH - self.borderWidth - 1:
@@ -296,29 +287,76 @@ class main():
                         self.tileList[currentY + addNumber][currentX].isFloor = True
                 if currentY == finalY and currentX == finalX:
                     break
+        for y in range(self.BOARDHEIGHT):
+            for x in range(self.BOARDWIDTH):
+                self.backgroundGroup.add(self.tileList[y][x])
         while True:
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
             if self.tileList[pointy][pointx].isRoom == True:
-                self.player = playerObjet(self.TILESIZE, int(self.DISPLAYWIDTH/ 2) * self.TILESIZE, int(self.DISPLAYHEIGHT/2) * self.TILESIZE, self.hallway)
+                tempPlayer = Player(self.TILESIZE, int(self.DISPLAYWIDTH/ 2) * self.TILESIZE, int(self.DISPLAYHEIGHT/2) * self.TILESIZE, self.hallway)
+                self.playerGroup.add(tempPlayer)
+                self.playerSprite = tempPlayer
+                self.playerSprite.rect.update(self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.TILESIZE, self.TILESIZE)
+                print(self.playerSprite.rect)
                 self.playerX = self.tileList[pointy][pointx].x
                 self.playerY = self.tileList[pointy][pointx].y
                 break
     def drawBoard(self):
-        for y in range(self.BOARDHEIGHT):
-            for x in range(self.BOARDWIDTH):
-                self.tileList[y][x].drawTile(self.boardSurface)
+        pygame.sprite.Group.draw(self.backgroundGroup, self.boardSurface)
+        pygame.sprite.Group.draw(self.playerGroup, self.boardSurface)
         self.DISPLAYSURF.blit(self.boardSurface, (int(self.DISPLAYWIDTH/ 2) * self.TILESIZE - (self.playerX*self.TILESIZE), int(self.DISPLAYHEIGHT/2) * self.TILESIZE - (self.playerY*self.TILESIZE)))
-        self.player.drawPlayer(self.DISPLAYSURF)
+
     def restart(self):
         self.createdBoard = False
         self.tileList = []
         self.centerArray = []
         self.centerArrayNumber = 0
+        self.playerGroup = pygame.sprite.Group()
+        self.backgroundGroup = pygame.sprite.Group()
         self.playerX = 0
         self.playerY = 0
         self.player = ""
         self.playable = False
+    def move(self):
+        wentUp = False
+        wentDown = False
+        wentRight = False
+        wentLeft = False
+        if self.canGoUp == True:
+            self.playerY -= self.speed
+            self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
+            wentUp = True
+        if self.canGoLeft == True:
+            self.playerX -= self.speed
+            self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
+            wentLeft = True
+        if self.canGoDown == True:
+            self.playerY += self.speed
+            self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
+            wentDown = True
+        if self.canGoRight == True:
+            self.playerX += self.speed
+            self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
+            wentRight = True
+
+        spriteGroup = spritecollide(self.playerSprite, self.backgroundGroup, False)
+        for x in range(len(spriteGroup)):
+            if spriteGroup[x].isWall == True:
+                if wentUp == True:
+                    self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
+                    self.playerY += self.speed
+                if wentDown == True:
+                    self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
+                    self.playerY -= self.speed
+                if wentLeft == True:
+                    self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
+                    self.playerX += self.speed
+                if wentRight == True:
+                    self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
+                    self.playerX -= self.speed
+                break
+
 
 
 
