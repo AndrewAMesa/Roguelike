@@ -30,6 +30,33 @@ class tile(Sprite):
         self.TILESURF.blit(self.image, (0,0))
         self.TILESURF.set_colorkey((255, 255, 255))
         DISPLAYSURF.blit(self.TILESURF, (self.left, self.top))
+class Enemy(Sprite):
+    def __init__(self, _BOXSIZE, _left, _top, _image):
+        pygame.sprite.Sprite.__init__(self)
+        self.BOXSIZE = _BOXSIZE
+        self.left = _left
+        self.top = _top
+        self.TILESURF = pygame.Surface((self.BOXSIZE, self.BOXSIZE))
+        self.image = _image
+        self.rect = self.image.get_rect()
+        self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
+        self.speed = .1 * self.BOXSIZE
+    def moveTowardsPlayer(self, player, backgroundGroup):
+        # Find direction vector (dx, dy) between enemy and player.
+        dirvect = pygame.math.Vector2(player.rect.x - self.rect.x, player.rect.y - self.rect.y)
+        if dirvect.x != 0 or dirvect.y != 0:
+            dirvect.normalize()
+            # Move along this normalized vector towards the player at current speed.
+            dirvect.scale_to_length(self.speed)
+            self.rect.y += dirvect.y
+            self.rect.x += dirvect.x
+            spriteGroup = spritecollide(self, backgroundGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup[x].isWall == True:
+                    self.rect.y -= dirvect.y
+                    self.rect.x -= dirvect.x
+                    break
+
 class Player(Sprite):
     def __init__(self, _BOXSIZE, _left, _top, _image):
         pygame.sprite.Sprite.__init__(self)
@@ -46,8 +73,8 @@ class Player(Sprite):
 class main():
     DISPLAYWIDTH = 16
     DISPLAYHEIGHT = 12
-    BOARDWIDTH = 71
-    BOARDHEIGHT = 71
+    BOARDWIDTH = 61
+    BOARDHEIGHT = 61
     TILESIZE = 30
     fpsClock = pygame.time.Clock()
     milliseconds = 0
@@ -84,7 +111,7 @@ class main():
     maxYlength = 8
     borderWidth = 12
     roomNumberMin = 10
-    roomNumberMax = 20
+    roomNumberMax = 15
     hallWayRandomMove = 1
     minHallwayLength = 4
     chanceOfDoubleHallway = 3
@@ -94,6 +121,7 @@ class main():
     playerSprite = pygame.sprite
     playerGroup = pygame.sprite.Group()
     backgroundGroup = pygame.sprite.Group()
+    enemyGroup = pygame.sprite.Group()
 
     #Images
     Floor = pygame.image.load("images/TestFloor.png")
@@ -298,13 +326,20 @@ class main():
                 self.playerGroup.add(tempPlayer)
                 self.playerSprite = tempPlayer
                 self.playerSprite.rect.update(self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.TILESIZE, self.TILESIZE)
-                print(self.playerSprite.rect)
                 self.playerX = self.tileList[pointy][pointx].x
                 self.playerY = self.tileList[pointy][pointx].y
+                break
+        while True:
+            pointx = int(random.random()*self.BOARDWIDTH)
+            pointy = int(random.random()*self.BOARDHEIGHT)
+            if self.tileList[pointy][pointx].isRoom == True:
+                tempEnemy= Enemy(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.hallway)
+                self.enemyGroup.add(tempEnemy)
                 break
     def drawBoard(self):
         pygame.sprite.Group.draw(self.backgroundGroup, self.boardSurface)
         pygame.sprite.Group.draw(self.playerGroup, self.boardSurface)
+        pygame.sprite.Group.draw(self.enemyGroup, self.boardSurface)
         self.DISPLAYSURF.blit(self.boardSurface, (int(self.DISPLAYWIDTH/ 2) * self.TILESIZE - (self.playerX*self.TILESIZE), int(self.DISPLAYHEIGHT/2) * self.TILESIZE - (self.playerY*self.TILESIZE)))
 
     def restart(self):
@@ -319,43 +354,52 @@ class main():
         self.player = ""
         self.playable = False
     def move(self):
-        wentUp = False
-        wentDown = False
-        wentRight = False
-        wentLeft = False
-        if self.canGoUp == True:
-            self.playerY -= self.speed
-            self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
-            wentUp = True
-        if self.canGoLeft == True:
-            self.playerX -= self.speed
-            self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
-            wentLeft = True
-        if self.canGoDown == True:
-            self.playerY += self.speed
-            self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
-            wentDown = True
-        if self.canGoRight == True:
-            self.playerX += self.speed
-            self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
-            wentRight = True
-
-        spriteGroup = spritecollide(self.playerSprite, self.backgroundGroup, False)
-        for x in range(len(spriteGroup)):
-            if spriteGroup[x].isWall == True:
-                if wentUp == True:
-                    self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
-                    self.playerY += self.speed
-                if wentDown == True:
-                    self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
-                    self.playerY -= self.speed
-                if wentLeft == True:
-                    self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
-                    self.playerX += self.speed
-                if wentRight == True:
-                    self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
-                    self.playerX -= self.speed
-                break
+        print("UP" + str (self.canGoUp))
+        print("Down" + str(self.canGoDown))
+        enemySprites = self.enemyGroup.sprites()
+        for x in range(len(enemySprites)):
+            enemySprites[x].moveTowardsPlayer(self.playerSprite, self.backgroundGroup)
+        if self.milliseconds > 80 and self.sprinting == True:
+            self.speed = .5
+            self.canSprint = False
+            self.milliseconds = 0
+            self.sprinting = False
+        if self.milliseconds > 300 and self.canSprint == False:
+            self.canSprint = True
+        if self.canGoUp == True or self.canGoDown == True:
+            if self.canGoUp == True:
+                self.playerY -= self.speed
+                self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
+            if self.canGoDown == True:
+                self.playerY += self.speed
+                self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
+            spriteGroup = spritecollide(self.playerSprite, self.backgroundGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup[x].isWall == True:
+                    if self.canGoUp == True:
+                        self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
+                        self.playerY += self.speed
+                    if self.canGoDown == True:
+                        self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
+                        self.playerY -= self.speed
+                    break
+        if self.canGoLeft == True or self.canGoRight == True:
+            if self.canGoLeft == True:
+                self.playerX -= self.speed
+                self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
+            if self.canGoRight == True:
+                self.playerX += self.speed
+                self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
+            spriteGroup = spritecollide(self.playerSprite, self.backgroundGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup[x].isWall == True:
+                    if self.canGoLeft == True:
+                        self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
+                        self.playerX += self.speed
+                    if self.canGoRight == True:
+                        self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
+                        self.playerX -= self.speed
+                    break
 
 
 
