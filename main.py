@@ -21,6 +21,8 @@ class tile(Sprite):
         self.isFloor = False
         self.isWall = False
         self.isRoom = False
+        self.isEnemy = False
+        self.isPlayer = False
         self.image = _image
         self.rect = self.image.get_rect()
         self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
@@ -40,22 +42,123 @@ class Enemy(Sprite):
         self.image = _image
         self.rect = self.image.get_rect()
         self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
-        self.speed = .1 * self.BOXSIZE
-    def moveTowardsPlayer(self, player, backgroundGroup):
-        # Find direction vector (dx, dy) between enemy and player.
+        self.speed = .2
+        self.following = False
+        self.canGoVerticle = True
+        self.canGoHorizontal = True
+        self.randomMovementX = 0
+        self.randomMovementY = 0
+        self.randomlyMovingX = False
+        self.randomlyMovingY = False
+        self.leavingCorner = False
+        self.cornerMovementY = 0
+        self.cornerMovementX = 0
+        self.movingDirection = ""
+    def moveTowardsPlayer(self, player, backgroundGroup, distanceToPlayer, maxFollowDistance):
         dirvect = pygame.math.Vector2(player.rect.x - self.rect.x, player.rect.y - self.rect.y)
-        if dirvect.x != 0 or dirvect.y != 0:
-            dirvect.normalize()
-            # Move along this normalized vector towards the player at current speed.
-            dirvect.scale_to_length(self.speed)
+        if self.following == True and abs(dirvect.x) >= maxFollowDistance * self.BOXSIZE + 1 or abs(dirvect.y) >= maxFollowDistance * self.BOXSIZE + 1:
+                self.following = False
+        if (dirvect.x != 0 or dirvect.y != 0) and (self.following == True or abs(dirvect.x) <= distanceToPlayer*self.BOXSIZE + 1 and abs(dirvect.y) <= distanceToPlayer*self.BOXSIZE + 1):
+            if self.following == False:
+                self.following = True
+            if self.canGoVerticle == False and self.canGoHorizontal == False and self.leavingCorner == False:
+                self.randomlyMovingX = False
+                self.randomlyMovingY = False
+                self.leavingCorner = True
+                tempCheck = int(random.random() * 2) + 1
+                if tempCheck == 1:
+                    self.movingDirection = "HOR"
+                else:
+                    self.movingDirection = "VER"
+            elif abs(dirvect.x) < self.BOXSIZE and abs(dirvect.x) > 0 and self.leavingCorner == False:
+                self.randomlyMovingX = True
+            elif abs(dirvect.y) < self.BOXSIZE and abs(dirvect.y) > 0 and self.leavingCorner == False:
+                self.randomlyMovingY = True
+            if dirvect.y < 0:
+                dirvect.y = -1
+            elif dirvect.y > 0:
+                dirvect.y = 1
+            else:
+                dirvect.y = 0
+            if dirvect.x < 0:
+                dirvect.x = -1
+            elif dirvect.x > 0:
+                dirvect.x = 1
+            else:
+                dirvect.x = 0
+            dirvect.y *= self.speed*self.BOXSIZE
+            dirvect.x *= self.speed * self.BOXSIZE
+            if self.leavingCorner == True:
+                if self.cornerMovementY == 0 and self.cornerMovementX == 0:
+                    if self.movingDirection == "HOR":
+                        self.cornerMovementX = dirvect.x * -1
+                    else:
+                        self.cornerMovementY = dirvect.y * -1
+                if self.movingDirection == "HOR":
+                    dirvect.x = self.cornerMovementX
+                else:
+                    dirvect.y = self.cornerMovementY
+            elif self.randomlyMovingX == True:
+                if self.randomMovementX == 0:
+                    self.randomMovementX = dirvect.x
+                dirvect.x = self.randomMovementX
+            elif self.randomlyMovingY == True:
+                if self.randomMovementY == 0:
+                    self.randomMovementY = dirvect.y
+                dirvect.y = self.randomMovementY
             self.rect.y += dirvect.y
+            spriteGroup = spritecollide(self, backgroundGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup[x].isWall == True:
+                    self.rect.y += dirvect.y * -1
+                    self.canGoVerticle = False
+                    if self.movingDirection == "VER":
+                        print("in loop 1")
+                        self.leavingCorner = False
+                        self.cornerMovementY = 0
+                        self.movingDirection = ""
+                    break
+                elif x == len(spriteGroup) - 1:
+                    if self.movingDirection == "HOR":
+                        self.leavingCorner = False
+                        self.cornerMovementX = 0
+                        self.movingDirection = ""
+                    self.randomlyMovingX = False
+                    self.randomMovementX = 0
+                    self.canGoVerticle = True
+            spriteGroup = spritecollide(self, self.groups()[0], False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup != None:
+                    if spriteGroup[x] != self:
+                        self.rect.y += dirvect.y * -1
+                        self.canGoVerticle = False
+                        break
             self.rect.x += dirvect.x
             spriteGroup = spritecollide(self, backgroundGroup, False)
             for x in range(len(spriteGroup)):
                 if spriteGroup[x].isWall == True:
-                    self.rect.y -= dirvect.y
-                    self.rect.x -= dirvect.x
+                    self.rect.x += dirvect.x * -1
+                    self.canGoHorizontal = False
+                    if self.movingDirection == "HOR":
+                        self.leavingCorner = False
+                        self.cornerMovementX = 0
+                        self.movingDirection = ""
                     break
+                elif x == len(spriteGroup) - 1:
+                    if self.movingDirection == "VER":
+                        self.leavingCorner = False
+                        self.cornerMovementY = 0
+                        self.movingDirection = ""
+                    self.randomlyMovingY = False
+                    self.randomMovementY = 0
+                    self.canGoHorizontal = True
+            spriteGroup = spritecollide(self, self.groups()[0], False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup != None:
+                    if spriteGroup[x] != self:
+                        self.rect.x += dirvect.x * -1
+                        self.canGoHorizontal = False
+                        break
 
 class Player(Sprite):
     def __init__(self, _BOXSIZE, _left, _top, _image):
@@ -71,10 +174,10 @@ class Player(Sprite):
         self.rect.x = self.rect.x + x
         self.rect.y = self.rect.y + y
 class main():
-    DISPLAYWIDTH = 16
-    DISPLAYHEIGHT = 12
-    BOARDWIDTH = 61
-    BOARDHEIGHT = 61
+    DISPLAYWIDTH = 15
+    DISPLAYHEIGHT = 15
+    BOARDWIDTH = 57
+    BOARDHEIGHT = 57
     TILESIZE = 30
     fpsClock = pygame.time.Clock()
     milliseconds = 0
@@ -109,13 +212,18 @@ class main():
     maxXlength = 8
     minYLength = 3
     maxYlength = 8
-    borderWidth = 12
+    borderWidth = int(DISPLAYWIDTH/2)
     roomNumberMin = 10
     roomNumberMax = 15
     hallWayRandomMove = 1
     minHallwayLength = 4
-    chanceOfDoubleHallway = 3
+    chanceOfDoubleHallway = 0
     roomGap = 2
+
+    #Enemy Config
+    maxFollowDistance = 10
+    minNumberOfEnemies = 8
+    maxNumberOfEnemies = 10
 
     #SpriteGroups
     playerSprite = pygame.sprite
@@ -322,6 +430,7 @@ class main():
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
             if self.tileList[pointy][pointx].isRoom == True:
+                self.tileList[pointy][pointx].isPlayer = True
                 tempPlayer = Player(self.TILESIZE, int(self.DISPLAYWIDTH/ 2) * self.TILESIZE, int(self.DISPLAYHEIGHT/2) * self.TILESIZE, self.hallway)
                 self.playerGroup.add(tempPlayer)
                 self.playerSprite = tempPlayer
@@ -330,12 +439,16 @@ class main():
                 self.playerY = self.tileList[pointy][pointx].y
                 break
         while True:
+            numberOfEnemies = int(random.random()*10) + 1
+            if numberOfEnemies >= self.minNumberOfEnemies and numberOfEnemies <= self.maxNumberOfEnemies:
+                break
+        while numberOfEnemies > 0:
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
-            if self.tileList[pointy][pointx].isRoom == True:
+            if self.tileList[pointy][pointx].isRoom == True and self.tileList[pointy][pointx].isPlayer == False and self.tileList[pointy][pointx].isEnemy == False:
                 tempEnemy= Enemy(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.hallway)
                 self.enemyGroup.add(tempEnemy)
-                break
+                numberOfEnemies -= 1
     def drawBoard(self):
         pygame.sprite.Group.draw(self.backgroundGroup, self.boardSurface)
         pygame.sprite.Group.draw(self.playerGroup, self.boardSurface)
@@ -349,16 +462,15 @@ class main():
         self.centerArrayNumber = 0
         self.playerGroup = pygame.sprite.Group()
         self.backgroundGroup = pygame.sprite.Group()
+        self.enemyGroup = pygame.sprite.Group()
         self.playerX = 0
         self.playerY = 0
         self.player = ""
         self.playable = False
     def move(self):
-        print("UP" + str (self.canGoUp))
-        print("Down" + str(self.canGoDown))
         enemySprites = self.enemyGroup.sprites()
         for x in range(len(enemySprites)):
-            enemySprites[x].moveTowardsPlayer(self.playerSprite, self.backgroundGroup)
+            enemySprites[x].moveTowardsPlayer(self.playerSprite, self.backgroundGroup, self.borderWidth, self.maxFollowDistance)
         if self.milliseconds > 80 and self.sprinting == True:
             self.speed = .5
             self.canSprint = False
