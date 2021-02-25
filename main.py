@@ -12,6 +12,7 @@ class centerInfo():
         self.array = _currentArray
 class tile(Sprite):
     def __init__(self, _BOXSIZE, _left, _top, _image, _x, _y):
+        pygame.sprite.Sprite.__init__(self)
         Sprite.__init__(self)
         self.BOXSIZE = _BOXSIZE
         self.left = _left
@@ -20,32 +21,212 @@ class tile(Sprite):
         self.isFloor = False
         self.isWall = False
         self.isRoom = False
+        self.isEnemy = False
+        self.isPlayer = False
         self.image = _image
+        self.rect = self.image.get_rect()
+        self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
         self.x = _x
         self.y = _y
     def drawTile(self, DISPLAYSURF):
         self.TILESURF.blit(self.image, (0,0))
         self.TILESURF.set_colorkey((255, 255, 255))
         DISPLAYSURF.blit(self.TILESURF, (self.left, self.top))
-class playerObjet(Sprite):
-    def __init__(self, _BOXSIZE, _left, _top, _image):
-        Sprite.__init__(self)
+class Enemy(Sprite):
+    def __init__(self, _BOXSIZE, _left, _top, _image, _moveTime, _damage, _critDamage, _waitAttack):
+        pygame.sprite.Sprite.__init__(self)
         self.BOXSIZE = _BOXSIZE
         self.left = _left
         self.top = _top
         self.TILESURF = pygame.Surface((self.BOXSIZE, self.BOXSIZE))
-        self.isFloor = False
-        self.isWall = False
         self.image = _image
-    def drawPlayer(self, DISPLAYSURF):
-        self.TILESURF.blit(self.image, (0,0))
-        self.TILESURF.set_colorkey((255, 255, 255))
-        DISPLAYSURF.blit(self.TILESURF, (self.left, self.top))
+        self.rect = self.image.get_rect()
+        self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
+        self.speed = .2
+        self.following = False
+        self.canGoVerticle = True
+        self.canGoHorizontal = True
+        self.randomMovementX = 0
+        self.randomMovementY = 0
+        self.randomlyMovingX = False
+        self.randomlyMovingY = False
+        self.leavingCorner = False
+        self.cornerMovementY = 0
+        self.cornerMovementX = 0
+        self.movingDirection = ""
+        self.milliseconds = 0
+        self.waitAttackTime = _waitAttack
+        self.moveTime = _moveTime
+        self.damage = _damage
+        self.critDamage = _critDamage
+        self.fpsClock = pygame.time.Clock()
+    def moveTowardsPlayer(self, player, backgroundGroup, distanceToPlayer, maxFollowDistance):
+        self.milliseconds += self.fpsClock.tick_busy_loop(60)
+        if self.milliseconds > self.moveTime:
+            if self.moveTime != 60:
+                self.moveTime = 60
+            self.milliseconds = 0
+            dirvect = pygame.math.Vector2(player.rect.x - self.rect.x, player.rect.y - self.rect.y)
+            if self.following == True and abs(dirvect.x) >= maxFollowDistance * self.BOXSIZE + 1 or abs(dirvect.y) >= maxFollowDistance * self.BOXSIZE + 1:
+                    self.following = False
+            if (dirvect.x != 0 or dirvect.y != 0) and (self.following == True or abs(dirvect.x) <= distanceToPlayer*self.BOXSIZE + 1 and abs(dirvect.y) <= distanceToPlayer*self.BOXSIZE + 1):
+                if self.following == False:
+                    self.following = True
+                if self.canGoVerticle == False and self.canGoHorizontal == False and self.leavingCorner == False:
+                    self.randomlyMovingX = False
+                    self.randomlyMovingY = False
+                    self.leavingCorner = True
+                    tempCheck = int(random.random() * 2) + 1
+                    if tempCheck == 1:
+                        self.movingDirection = "HOR"
+                    else:
+                        self.movingDirection = "VER"
+                elif abs(dirvect.x) < self.BOXSIZE and abs(dirvect.x) > 0 and self.leavingCorner == False:
+                    self.randomlyMovingX = True
+                elif abs(dirvect.y) < self.BOXSIZE and abs(dirvect.y) > 0 and self.leavingCorner == False:
+                    self.randomlyMovingY = True
+                if dirvect.y < 0:
+                    dirvect.y = -1
+                elif dirvect.y > 0:
+                    dirvect.y = 1
+                else:
+                    dirvect.y = 0
+                if dirvect.x < 0:
+                    dirvect.x = -1
+                elif dirvect.x > 0:
+                    dirvect.x = 1
+                else:
+                    dirvect.x = 0
+                dirvect.y *= self.speed*self.BOXSIZE
+                dirvect.x *= self.speed * self.BOXSIZE
+                if pygame.sprite.collide_rect(self, player):
+                    dirvect.y *= -1
+                    dirvect.x *= -1
+                    tempCheck = int((random.random()*4) + 1)
+                    if tempCheck > 1:
+                        player.health -= self.damage
+                    else:
+                        player.health -= self.critDamage
+                    self.moveTime = self.waitAttackTime
+                if self.leavingCorner == True:
+                    if self.cornerMovementY == 0 and self.cornerMovementX == 0:
+                        if self.movingDirection == "HOR":
+                            self.cornerMovementX = dirvect.x * -1
+                        else:
+                            self.cornerMovementY = dirvect.y * -1
+                    if self.movingDirection == "HOR":
+                        dirvect.x = self.cornerMovementX
+                    else:
+                        dirvect.y = self.cornerMovementY
+                elif self.randomlyMovingX == True:
+                    if self.randomMovementX == 0:
+                        self.randomMovementX = dirvect.x
+                    dirvect.x = self.randomMovementX
+                elif self.randomlyMovingY == True:
+                    if self.randomMovementY == 0:
+                        self.randomMovementY = dirvect.y
+                    dirvect.y = self.randomMovementY
+                self.rect.y += dirvect.y
+                spriteGroup = spritecollide(self, backgroundGroup, False)
+                for x in range(len(spriteGroup)):
+                    if spriteGroup[x].isWall == True:
+                        self.rect.y += dirvect.y * -1
+                        self.canGoVerticle = False
+                        if self.movingDirection == "VER":
+                            self.leavingCorner = False
+                            self.cornerMovementY = 0
+                            self.movingDirection = ""
+                        break
+                    elif x == len(spriteGroup) - 1:
+                        if self.movingDirection == "HOR":
+                            self.leavingCorner = False
+                            self.cornerMovementX = 0
+                            self.movingDirection = ""
+                        self.randomlyMovingX = False
+                        self.randomMovementX = 0
+                        self.canGoVerticle = True
+                spriteGroup = spritecollide(self, self.groups()[0], False)
+                for x in range(len(spriteGroup)):
+                    if spriteGroup != None and self.moveTime != 800:
+                        if spriteGroup[x] != self:
+                            self.rect.y += dirvect.y * -1
+                            self.canGoVerticle = False
+                            self.leavingCorner = False
+                            break
+                self.rect.x += dirvect.x
+                spriteGroup = spritecollide(self, backgroundGroup, False)
+                for x in range(len(spriteGroup)):
+                    if spriteGroup[x].isWall == True:
+                        self.rect.x += dirvect.x * -1
+                        self.canGoHorizontal = False
+                        if self.movingDirection == "HOR":
+                            self.leavingCorner = False
+                            self.cornerMovementX = 0
+                            self.movingDirection = ""
+                        break
+                    elif x == len(spriteGroup) - 1:
+                        if self.movingDirection == "VER":
+                            self.leavingCorner = False
+                            self.cornerMovementY = 0
+                            self.movingDirection = ""
+                        self.randomlyMovingY = False
+                        self.randomMovementY = 0
+                        self.canGoHorizontal = True
+                spriteGroup = spritecollide(self, self.groups()[0], False)
+                for x in range(len(spriteGroup)):
+                    if spriteGroup != None and self.moveTime != 800:
+                        if spriteGroup[x] != self:
+                            self.rect.x += dirvect.x * -1
+                            self.canGoHorizontal = False
+                            self.leavingCorner = False
+                            break
+class Weapon(Sprite):
+    def __init__(self, _left, _top, _image):
+        pygame.sprite.Sprite.__init__(self)
+        self.left = _left
+        self.top = _top
+        self.image = _image
+        self.rect = self.image.get_rect()
+        self.TILESURF = pygame.Surface((self.rect.width, self.rect.height))
+        self.rect.update(self.left, self.top, self.rect.width, self.rect.height)
+class Player(Sprite):
+    def __init__(self, _BOXSIZE, _left, _top, _image):
+        pygame.sprite.Sprite.__init__(self)
+        self.BOXSIZE = _BOXSIZE
+        self.left = _left
+        self.top = _top
+        self.image = _image
+        self.permanentImage = _image
+        self.rect = self.image.get_rect()
+        self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
+        self.direction = ""
+        self.health = 999
+        self.goingUp = False
+        self.goingDown = False
+        self.goingLeft = False
+        self.goingRight = False
+        self.sword = Weapon(self.left, self.top + int(self.BOXSIZE/2), pygame.image.load("images/Sword.png"))
+    def movePlayer(self, x, y):
+        self.rect.x = self.rect.x + x
+        self.rect.y = self.rect.y + y
+    def attackSword(self, DisplaySurf):
+        print("attack")
+    def redrawPlayer(self):
+        if self.direction == "DOWN":
+            self.image = pygame.transform.rotate(self.permanentImage, 180)
+        elif self.direction == "LEFT":
+            self.image = pygame.transform.rotate(self.permanentImage, 90)
+        elif self.direction == "RIGHT":
+            self.image = pygame.transform.rotate(self.permanentImage, -90)
+        else:
+            self.image = self.permanentImage
+
+
 class main():
-    DISPLAYWIDTH = 16
-    DISPLAYHEIGHT = 12
-    BOARDWIDTH = 71
-    BOARDHEIGHT = 71
+    DISPLAYWIDTH = 15
+    DISPLAYHEIGHT = 15
+    BOARDWIDTH = 57
+    BOARDHEIGHT = 57
     TILESIZE = 30
     fpsClock = pygame.time.Clock()
     milliseconds = 0
@@ -68,6 +249,7 @@ class main():
     playable = False
     canSprint = True
     sprinting = False
+    changed = False
 
     #player
     player = ""
@@ -80,19 +262,30 @@ class main():
     maxXlength = 8
     minYLength = 3
     maxYlength = 8
-    borderWidth = 12
+    borderWidth = int(DISPLAYWIDTH/2)
     roomNumberMin = 10
-    roomNumberMax = 20
+    roomNumberMax = 15
     hallWayRandomMove = 1
     minHallwayLength = 4
-    chanceOfDoubleHallway = 3
+    chanceOfDoubleHallway = 0
     roomGap = 2
 
+    #Enemy Config
+    maxFollowDistance = 10
+    minNumberOfEnemies = 8
+    maxNumberOfEnemies = 10
+
+    #SpriteGroups
+    playerSprite = pygame.sprite
+    playerGroup = pygame.sprite.Group()
+    backgroundGroup = pygame.sprite.Group()
+    enemyGroup = pygame.sprite.Group()
 
     #Images
     Floor = pygame.image.load("images/TestFloor.png")
     Wall = pygame.image.load("images/TestWall.png")
-    hallway = pygame.image.load("images/PlayerTest2.png")
+    Enemy = pygame.image.load("images/Enemy1.png")
+    Player = pygame.image.load("images/PlayerTest2.png")
 
     def main(self):
         while True:
@@ -113,12 +306,16 @@ class main():
                                 self.restart()
                             if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                                 self.canGoLeft = True
+                                self.changed = False
                             if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                                 self.canGoRight = True
+                                self.changed = False
                             if event.key == pygame.K_w or event.key == pygame.K_UP:
                                 self.canGoUp = True
+                                self.changed = False
                             if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                                 self.canGoDown = True
+                                self.changed = False
                             if event.key == pygame.K_LSHIFT and self.canSprint == True:
                                 self.milliseconds = 0
                                 self.sprinting = True
@@ -126,30 +323,23 @@ class main():
                     elif event.type == KEYUP:
                         if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                             self.canGoLeft = False
+                            self.changed = False
                         if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                             self.canGoRight = False
+                            self.changed = False
                         if event.key == pygame.K_w or event.key == pygame.K_UP:
                             self.canGoUp = False
+                            self.changed = False
                         if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                             self.canGoDown = False
+                            self.changed = False
                         if event.key == pygame.K_LSHIFT:
                             self.sprinting = False
                             self.speed = .5
-            if self.canGoUp == True:
-                self.playerY -= self.speed
-            if self.canGoLeft == True:
-                self.playerX -= self.speed
-            if self.canGoDown == True:
-                self.playerY += self.speed
-            if self.canGoRight == True:
-                self.playerX += self.speed
-            if self.milliseconds > 80 and self.sprinting == True:
-                self.speed = .5
-                self.canSprint = False
-                self.milliseconds = 0
-                self.sprinting = False
-            if self.milliseconds > 300 and self.canSprint == False:
-                self.canSprint = True
+            print(self.playerSprite.health)
+            if self.playerSprite.health <= 0:
+                self.restart()
+            self.move()
             #Updating board
             if self.playable == True:
                 self.drawBoard()
@@ -167,14 +357,12 @@ class main():
                 tempLeft += self.TILESIZE
                 self.tileList[y][x] = tile(self.TILESIZE, tempLeft, tempTop, self.Wall, x, y)
                 self.tileList[y][x].isWall = True
-                self.boardSprites = tile(self.TILESIZE, tempLeft, tempTop, self.Wall, x, y)
         while True:
             roomAmount = int ((random.random()* self.roomNumberMax) + 1)
             if roomAmount >= self.roomNumberMin and roomAmount <= self.roomNumberMax:
                 break
         tempNumber = 0
         while roomAmount > 0:
-            print("room" + str(roomAmount))
             while True:
                 xStart = int((random.random()* (self.BOARDWIDTH - self.maxXlength - self.borderWidth)))
                 if xStart > self.borderWidth + 1 and xStart < self.BOARDWIDTH - self.borderWidth - 1:
@@ -296,29 +484,135 @@ class main():
                         self.tileList[currentY + addNumber][currentX].isFloor = True
                 if currentY == finalY and currentX == finalX:
                     break
+        for y in range(self.BOARDHEIGHT):
+            for x in range(self.BOARDWIDTH):
+                self.backgroundGroup.add(self.tileList[y][x])
         while True:
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
             if self.tileList[pointy][pointx].isRoom == True:
-                self.player = playerObjet(self.TILESIZE, int(self.DISPLAYWIDTH/ 2) * self.TILESIZE, int(self.DISPLAYHEIGHT/2) * self.TILESIZE, self.hallway)
+                self.tileList[pointy][pointx].isPlayer = True
+                tempPlayer = Player(self.TILESIZE, int(self.DISPLAYWIDTH/ 2) * self.TILESIZE, int(self.DISPLAYHEIGHT/2) * self.TILESIZE, self.Player)
+                self.playerGroup.add(tempPlayer)
+                self.playerSprite = tempPlayer
+                self.playerSprite.rect.update(self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.TILESIZE, self.TILESIZE)
                 self.playerX = self.tileList[pointy][pointx].x
                 self.playerY = self.tileList[pointy][pointx].y
+                for y in range(pointy - self.borderWidth, pointy + self.borderWidth):
+                    for x in range(pointx - self.borderWidth, pointx + self.borderWidth):
+                        self.tileList[y][x].isPlayer = True
                 break
+        while True:
+            numberOfEnemies = int(random.random()*10) + 1
+            if numberOfEnemies >= self.minNumberOfEnemies and numberOfEnemies <= self.maxNumberOfEnemies:
+                break
+        while numberOfEnemies > 0:
+            pointx = int(random.random()*self.BOARDWIDTH)
+            pointy = int(random.random()*self.BOARDHEIGHT)
+            if self.tileList[pointy][pointx].isRoom == True and self.tileList[pointy][pointx].isPlayer == False and self.tileList[pointy][pointx].isEnemy == False:
+                tempEnemy= Enemy(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Enemy, 60, 15, 30, 800)
+                self.enemyGroup.add(tempEnemy)
+                numberOfEnemies -= 1
     def drawBoard(self):
-        for y in range(self.BOARDHEIGHT):
-            for x in range(self.BOARDWIDTH):
-                self.tileList[y][x].drawTile(self.boardSurface)
+        pygame.sprite.Group.draw(self.backgroundGroup, self.boardSurface)
+        pygame.sprite.Group.draw(self.playerGroup, self.boardSurface)
+        pygame.sprite.Group.draw(self.enemyGroup, self.boardSurface)
         self.DISPLAYSURF.blit(self.boardSurface, (int(self.DISPLAYWIDTH/ 2) * self.TILESIZE - (self.playerX*self.TILESIZE), int(self.DISPLAYHEIGHT/2) * self.TILESIZE - (self.playerY*self.TILESIZE)))
-        self.player.drawPlayer(self.DISPLAYSURF)
     def restart(self):
         self.createdBoard = False
         self.tileList = []
         self.centerArray = []
         self.centerArrayNumber = 0
+        self.playerGroup = pygame.sprite.Group()
+        self.backgroundGroup = pygame.sprite.Group()
+        self.enemyGroup = pygame.sprite.Group()
         self.playerX = 0
         self.playerY = 0
         self.player = ""
         self.playable = False
+    def move(self):
+        enemySprites = self.enemyGroup.sprites()
+        for x in range(len(enemySprites)):
+            enemySprites[x].moveTowardsPlayer(self.playerSprite, self.backgroundGroup, self.borderWidth, self.maxFollowDistance)
+        if self.milliseconds > 80 and self.sprinting == True:
+            self.speed = .5
+            self.canSprint = False
+            self.milliseconds = 0
+            self.sprinting = False
+        if self.milliseconds > 300 and self.canSprint == False:
+            self.canSprint = True
+        if self.canGoUp == True or self.canGoDown == True:
+            if self.canGoUp == True and self.canGoDown == False:
+                if self.playerSprite.direction != "UP" and self.changed == False:
+                    self.playerSprite.direction = "UP"
+                    self.playerSprite.redrawPlayer()
+                    self.changed = True
+                self.playerY -= self.speed
+                self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
+            if self.canGoDown == True and self.canGoUp == False :
+                if self.playerSprite.direction != "DOWN" and self.changed == False:
+                    self.playerSprite.direction = "DOWN"
+                    self.playerSprite.redrawPlayer()
+                    self.changed = True
+                self.playerY += self.speed
+                self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
+            spriteGroup = spritecollide(self.playerSprite, self.enemyGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup != None:
+                    if self.canGoUp == True:
+                        self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
+                        self.playerY += self.speed
+                    if self.canGoDown == True:
+                        self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
+                        self.playerY -= self.speed
+                    break
+            spriteGroup = spritecollide(self.playerSprite, self.backgroundGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup[x].isWall == True:
+                    if self.canGoUp == True:
+                        self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
+                        self.playerY += self.speed
+                    if self.canGoDown == True:
+                        self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
+                        self.playerY -= self.speed
+                    break
+        if self.canGoLeft == True or self.canGoRight == True:
+            if self.canGoLeft == True and self.canGoRight == False:
+                if self.playerSprite.direction != "LEFT" and self.changed == False:
+                    self.playerSprite.direction = "LEFT"
+                    self.playerSprite.redrawPlayer()
+                    self.changed = True
+                self.playerX -= self.speed
+                self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
+            if self.canGoRight == True and self.canGoLeft == False:
+                if self.playerSprite.direction != "RIGHT" and self.changed == False:
+                    self.playerSprite.direction = "RIGHT"
+                    self.playerSprite.redrawPlayer()
+                    self.changed = True
+                self.playerX += self.speed
+                self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
+            spriteGroup = spritecollide(self.playerSprite, self.enemyGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup != None:
+                    if self.canGoLeft == True:
+                        self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
+                        self.playerX += self.speed
+                    if self.canGoRight == True:
+                        self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
+                        self.playerX -= self.speed
+                    break
+            spriteGroup = spritecollide(self.playerSprite, self.backgroundGroup, False)
+            for x in range(len(spriteGroup)):
+                if spriteGroup[x].isWall == True:
+                    if self.canGoLeft == True:
+                        self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
+                        self.playerX += self.speed
+                    if self.canGoRight == True:
+                        self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
+                        self.playerX -= self.speed
+                    break
+
+
 
 
 
