@@ -41,6 +41,7 @@ class Enemy(Sprite):
         self.top = _top
         self.TILESURF = pygame.Surface((self.BOXSIZE, self.BOXSIZE))
         self.image = _image
+        self.permanentImage =  _image
         self.rect = self.image.get_rect()
         self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
         self.speed = .2
@@ -70,6 +71,7 @@ class Enemy(Sprite):
             if self.moveTime != 60:
                 self.moveTime = 60
             dirvect = pygame.math.Vector2(player.rect.x - self.rect.x, player.rect.y - self.rect.y)
+            self.changeimage(dirvect)
             if self.following == True and abs(dirvect.x) >= maxFollowDistance * self.BOXSIZE + 1 or abs(dirvect.y) >= maxFollowDistance * self.BOXSIZE + 1:
                     self.following = False
             if (dirvect.x != 0 or dirvect.y != 0) and (self.following == True or abs(dirvect.x) <= distanceToPlayer*self.BOXSIZE + 1 and abs(dirvect.y) <= distanceToPlayer*self.BOXSIZE + 1):
@@ -183,6 +185,27 @@ class Enemy(Sprite):
                             self.canGoHorizontal = False
                             self.leavingCorner = False
                             break
+    def changeimage(self, vector):
+        if vector.x <= 0 and vector.y <= 0:
+            if abs(vector.x) > abs(vector.y):
+                self.image = pygame.transform.rotate(self.permanentImage, 90)
+            else:
+                self.image = self.permanentImage
+        elif vector.x >= 0 and vector.y <= 0:
+            if abs(vector.x) > abs(vector.y):
+                self.image = pygame.transform.rotate(self.permanentImage, -90)
+            else:
+                self.image = self.permanentImage
+        elif vector.x <= 0 and vector.y >= 0:
+            if abs(vector.x) > abs(vector.y):
+                self.image = pygame.transform.rotate(self.permanentImage, 90)
+            else:
+                self.image = pygame.transform.rotate(self.permanentImage, -180)
+        elif vector.x >= 0 and vector.y >= 0:
+            if abs(vector.x) > abs(vector.y):
+                self.image = pygame.transform.rotate(self.permanentImage, -90)
+            else:
+                self.image = pygame.transform.rotate(self.permanentImage, -180)
 class Weapon(Sprite):
     def __init__(self, _left, _top, _image):
         pygame.sprite.Sprite.__init__(self)
@@ -233,7 +256,7 @@ class Player(Sprite):
         self.laserX = self.rect.x
         self.laserY = self.rect.y
         self.laserDamage = 30
-        self.harmedCount = 15
+        self.harmedCount = 5
     def movePlayer(self, x, y):
         self.rect.x = self.rect.x + x
         self.rect.y = self.rect.y + y
