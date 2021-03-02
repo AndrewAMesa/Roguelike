@@ -23,6 +23,7 @@ class tile(Sprite):
         self.isRoom = False
         self.isEnemy = False
         self.isPlayer = False
+        self.isConnected = False
         self.image = _image
         self.rect = self.image.get_rect()
         self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
@@ -33,7 +34,7 @@ class tile(Sprite):
         self.TILESURF.set_colorkey((255, 255, 255))
         DISPLAYSURF.blit(self.TILESURF, (self.left, self.top))
 class Enemy(Sprite):
-    def __init__(self, _BOXSIZE, _left, _top, _image, _moveTime, _damage, _critDamage, _waitAttack):
+    def __init__(self, _BOXSIZE, _left, _top, _image, _moveTime, _damage, _critDamage, _waitAttack, _health):
         pygame.sprite.Sprite.__init__(self)
         self.BOXSIZE = _BOXSIZE
         self.left = _left
@@ -60,12 +61,14 @@ class Enemy(Sprite):
         self.damage = _damage
         self.critDamage = _critDamage
         self.fpsClock = pygame.time.Clock()
+        self.health = _health
+        self.hurt = False
     def moveTowardsPlayer(self, player, backgroundGroup, distanceToPlayer, maxFollowDistance):
         self.milliseconds += self.fpsClock.tick_busy_loop(60)
         if self.milliseconds > self.moveTime:
+            self.milliseconds = 0
             if self.moveTime != 60:
                 self.moveTime = 60
-            self.milliseconds = 0
             dirvect = pygame.math.Vector2(player.rect.x - self.rect.x, player.rect.y - self.rect.y)
             if self.following == True and abs(dirvect.x) >= maxFollowDistance * self.BOXSIZE + 1 or abs(dirvect.y) >= maxFollowDistance * self.BOXSIZE + 1:
                     self.following = False
@@ -187,11 +190,14 @@ class Weapon(Sprite):
         self.top = _top
         self.image = _image
         self.rect = self.image.get_rect()
-        self.TILESURF = pygame.Surface((self.rect.width, self.rect.height))
         self.rect.update(self.left, self.top, self.rect.width, self.rect.height)
+        self.count = 0
+        self.xMove = 0
+        self.yMove =0
 class Player(Sprite):
-    def __init__(self, _BOXSIZE, _left, _top, _image):
+    def __init__(self, _BOXSIZE, _left, _top, _image, _DisplaySurf):
         pygame.sprite.Sprite.__init__(self)
+        self.DisplaySurf = _DisplaySurf
         self.BOXSIZE = _BOXSIZE
         self.left = _left
         self.top = _top
@@ -200,26 +206,186 @@ class Player(Sprite):
         self.rect = self.image.get_rect()
         self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
         self.direction = ""
+        self.mousex = 0
+        self.mousey = 0
         self.health = 999
         self.goingUp = False
         self.goingDown = False
         self.goingLeft = False
         self.goingRight = False
-        self.sword = Weapon(self.left, self.top + int(self.BOXSIZE/2), pygame.image.load("images/Sword.png"))
+        self.sword = Weapon(self.rect.x, self.rect.y, pygame.image.load("images/Sword.png"))
+        self.permanentSwordRect = self.sword.rect
+        self.permanentSwordX = self.sword.rect.x
+        self.permanentSwordY = self.sword.rect.y
+        self.permanentSwordWidth = self.sword.rect.width
+        self.permanentSwordHeight = self.sword.rect.height
+        self.permanentSwordImage = self.sword.image
+        self.WeaponGroup = pygame.sprite.Group()
+        self.WeaponGroup.add(self.sword)
+        self.attacking = False
+        self.attackCount = 0
+        self.swordDamage = 15
+        self.harmedGroup = ""
+        self.laserCount = 0
+        self.laserGroup = pygame.sprite.Group()
+        self.maxLaserDistance = 9
+        self.laser = pygame.image.load("images/laser.png")
+        self.laserX = self.rect.x
+        self.laserY = self.rect.y
+        self.laserDamage = 30
+        self.harmedCount = 15
     def movePlayer(self, x, y):
         self.rect.x = self.rect.x + x
         self.rect.y = self.rect.y + y
-    def attackSword(self, DisplaySurf):
-        print("attack")
+        self.permanentSwordX = self.permanentSwordX + x
+        self.permanentSwordY = self.permanentSwordY + y
+        self.sword.rect.x = self.sword.rect.x + x
+        self.sword.rect.y = self.sword.rect.y + y
+    def attackLaser(self):
+        if self.harmedCount >= 5:
+            self.harmedCount -= 5
+            laser = Weapon(self.laserX, self.laserY, self.laser)
+            if self.direction == "UP":
+                laser.yMove = -20
+                laser.xMove = 0
+            elif self.direction == "DOWN":
+                laser.yMove = 20
+                laser.xMove = 0
+            elif self.direction == "LEFT":
+                laser.yMove = 0
+                laser.xMove = -20
+            elif self.direction == "RIGHT":
+                laser.yMove = 0
+                laser.xMove = 20
+            self.laserGroup.add(laser)
+    def movingLaser(self, enemyGroup, backgroundGroup):
+        spriteList = self.laserGroup.sprites()
+        for x in range(len(spriteList)):
+            spriteList[x].rect.x += spriteList[x].xMove
+            spriteList[x].rect.y += spriteList[x].yMove
+            spriteList[x].count += 1
+            if spriteList[x].count > self.maxLaserDistance:
+                spriteList[x].kill()
+            spriteGroup = spritecollide(spriteList[x], enemyGroup, False)
+            for y in range(len(spriteGroup)):
+                spriteGroup[y].health -= self.laserDamage
+                if spriteGroup[y].health <= 0:
+                    spriteGroup[y].kill()
+                spriteList[x].kill()
+            spriteGroup = spritecollide(spriteList[x], backgroundGroup, False)
+            for y in range(len(spriteGroup)):
+                if spriteGroup[y].isWall == True:
+                    spriteList[x].kill()
+    def attackSword(self, enemyGroup, backgroundGroup):
+        spriteGroup = spritecollide(self.sword, backgroundGroup, False)
+        for y in range(len(spriteGroup)):
+            if spriteGroup[y].isWall == True:
+                self.attacking = False
+        if self.attacking == True:
+            if self.direction == "UP" or self.direction == "DOWN":
+                if self.direction == "UP":
+                    number = 7
+                else:
+                    number = -7
+                self.attackCount +=7
+                if self.attackCount <= 14:
+                    self.sword.rect.y -= number
+                else:
+                    self.sword.rect.y += number
+                if self.attackCount == 28:
+                    self.attacking = False
+                    self.attackCount = 0
+            elif self.direction == "LEFT" or self.direction == "RIGHT":
+                if self.direction == "LEFT":
+                    number = 7
+                else:
+                    number = -7
+                self.attackCount += 7
+                if self.attackCount <= 14:
+                    self.sword.rect.x -= number
+                else:
+                    self.sword.rect.x += number
+                if self.attackCount == 28:
+                    self.attacking = False
+                    self.attackCount = 0
+            spriteGroup = spritecollide(self.sword, enemyGroup, False)
+            for x in range(len(spriteGroup)):
+                self.harmedGroup = spriteGroup
+                if spriteGroup[x].hurt == False:
+                    self.harmedCount += 1
+                    spriteGroup[x].health -= self.swordDamage
+                    spriteGroup[x].hurt = True
+                if spriteGroup[x].health <= 0:
+                    spriteGroup[x].kill()
+            if self.attacking == False:
+                for x in range(len(self.harmedGroup)):
+                    self.harmedGroup[x].hurt = False
+            pygame.sprite.Group.draw(self.WeaponGroup, self.DisplaySurf)
+            pygame.display.update()
+    def findAttackDirection(self):
+        dirvect = pygame.math.Vector2(self.mousex - self.DisplaySurf.get_width()/2, self.mousey -  self.DisplaySurf.get_height()/2)
+        if dirvect.x < 0 and dirvect.y < 0:
+            if abs(dirvect.x) > abs(dirvect.y):
+                self.direction = "LEFT"
+            else:
+                self.direction = "UP"
+        elif dirvect.x > 0 and dirvect.y < 0:
+            if abs(dirvect.x) > abs(dirvect.y):
+                self.direction = "RIGHT"
+            else:
+                self.direction = "UP"
+        elif dirvect.x < 0 and dirvect.y > 0:
+            if abs(dirvect.x) > abs(dirvect.y):
+                self.direction = "LEFT"
+            else:
+                self.direction = "DOWN"
+        elif dirvect.x > 0 and dirvect.y > 0:
+            if abs(dirvect.x) > abs(dirvect.y):
+                self.direction = "RIGHT"
+            else:
+                self.direction = "DOWN"
+        self.redrawPlayer()
     def redrawPlayer(self):
         if self.direction == "DOWN":
             self.image = pygame.transform.rotate(self.permanentImage, 180)
+            self.sword.image = pygame.transform.rotate(self.permanentSwordImage, 180)
+            self.sword.rect.x = self.permanentSwordX - self.BOXSIZE + 36
+            self.sword.rect.y = self.permanentSwordY + self.BOXSIZE - 23
+            self.sword.rect.width = self.permanentSwordWidth
+            self.sword.rect.height = self.permanentSwordHeight
+            (tempX, tempY) = self.rect.bottomright
+            self.laserX = tempX - 11
+            self.laserY = tempY - 21
         elif self.direction == "LEFT":
             self.image = pygame.transform.rotate(self.permanentImage, 90)
+            self.sword.image = pygame.transform.rotate(self.permanentSwordImage, 90)
+            self.sword.rect.x = self.permanentSwordX - self.BOXSIZE + 17
+            self.sword.rect.y = self.permanentSwordY + 6
+            self.sword.rect.width = self.permanentSwordHeight
+            self.sword.rect.height = self.permanentSwordWidth
+            (tempX, tempY) = self.rect.bottomleft
+            self.laserX = tempX + 17
+            self.laserY = tempY - 11
         elif self.direction == "RIGHT":
             self.image = pygame.transform.rotate(self.permanentImage, -90)
-        else:
+            self.sword.image = pygame.transform.rotate(self.permanentSwordImage, -90)
+            self.sword.rect.x = self.permanentSwordX + self.BOXSIZE - 23
+            self.sword.rect.y = self.permanentSwordY + self.BOXSIZE - 9
+            self.sword.rect.width = self.permanentSwordHeight
+            self.sword.rect.height = self.permanentSwordWidth
+            (tempX, tempY) = self.rect.topright
+            self.laserX = tempX - 21
+            self.laserY = tempY + 7
+        elif self.direction == "UP":
             self.image = self.permanentImage
+            self.sword.image = self.permanentSwordImage
+            self.sword.rect.x = self.permanentSwordX + 21
+            self.sword.rect.y = self.permanentSwordY - 13
+            self.sword.rect.width = self.permanentSwordWidth
+            self.sword.rect.height = self.permanentSwordHeight
+            (tempX, tempY) = self.rect.topleft
+            self.laserX = tempX + 7
+            self.laserY = tempY + 17
 
 
 class main():
@@ -249,13 +415,12 @@ class main():
     playable = False
     canSprint = True
     sprinting = False
-    changed = False
 
     #player
     player = ""
     playerX = 0
     playerY = 0
-
+    healthObj = pygame.font.Font('freesansbold.ttf', 20)
 
     #Board Config
     minXLength = 3
@@ -274,6 +439,10 @@ class main():
     maxFollowDistance = 10
     minNumberOfEnemies = 8
     maxNumberOfEnemies = 10
+    minEnemyDamage = 20
+    maxEnemyDamage = 40
+    minEnemyHealth = 40
+    maxEnemyHealth = 80
 
     #SpriteGroups
     playerSprite = pygame.sprite
@@ -282,10 +451,11 @@ class main():
     enemyGroup = pygame.sprite.Group()
 
     #Images
-    Floor = pygame.image.load("images/TestFloor.png")
+    Floor = pygame.image.load("images/Floor.png")
     Wall = pygame.image.load("images/TestWall.png")
     Enemy = pygame.image.load("images/Enemy1.png")
-    Player = pygame.image.load("images/PlayerTest2.png")
+    Player = pygame.image.load("images/player.png")
+    Laser = pygame.image.load("images/laser.png")
 
     def main(self):
         while True:
@@ -301,21 +471,24 @@ class main():
                     if event.type == QUIT:
                         pygame.quit()
                         sys.exit()
+                    elif event.type == MOUSEMOTION:
+                        self.playerSprite.mousex, self.playerSprite.mousey = pygame.mouse.get_pos()
+                    elif event.type == MOUSEBUTTONDOWN:
+                        if pygame.mouse.get_pressed(3) == (True, False, False):
+                            self.playerSprite.attacking = True
+                        if pygame.mouse.get_pressed(3) == (False, False, True) and self.playerSprite.attacking == False:
+                            self.playerSprite.attackLaser()
                     elif event.type == KEYDOWN:
                             if event.key == pygame.K_RETURN:
                                 self.restart()
                             if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                                 self.canGoLeft = True
-                                self.changed = False
                             if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                                 self.canGoRight = True
-                                self.changed = False
                             if event.key == pygame.K_w or event.key == pygame.K_UP:
                                 self.canGoUp = True
-                                self.changed = False
                             if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                                 self.canGoDown = True
-                                self.changed = False
                             if event.key == pygame.K_LSHIFT and self.canSprint == True:
                                 self.milliseconds = 0
                                 self.sprinting = True
@@ -323,25 +496,24 @@ class main():
                     elif event.type == KEYUP:
                         if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                             self.canGoLeft = False
-                            self.changed = False
                         if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                             self.canGoRight = False
-                            self.changed = False
                         if event.key == pygame.K_w or event.key == pygame.K_UP:
                             self.canGoUp = False
-                            self.changed = False
                         if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                             self.canGoDown = False
-                            self.changed = False
                         if event.key == pygame.K_LSHIFT:
                             self.sprinting = False
                             self.speed = .5
-            print(self.playerSprite.health)
             if self.playerSprite.health <= 0:
                 self.restart()
             self.move()
             #Updating board
             if self.playable == True:
+                self.playerSprite.attackSword(self.enemyGroup, self.backgroundGroup)
+                if self.playerSprite.attacking == False:
+                    self.playerSprite.findAttackDirection()
+                self.playerSprite.movingLaser(self.enemyGroup, self.backgroundGroup)
                 self.drawBoard()
                 pygame.display.update()
             self.fpsClock.tick(30)
@@ -492,10 +664,10 @@ class main():
             pointy = int(random.random()*self.BOARDHEIGHT)
             if self.tileList[pointy][pointx].isRoom == True:
                 self.tileList[pointy][pointx].isPlayer = True
-                tempPlayer = Player(self.TILESIZE, int(self.DISPLAYWIDTH/ 2) * self.TILESIZE, int(self.DISPLAYHEIGHT/2) * self.TILESIZE, self.Player)
+                tempPlayer = Player(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Player, self.DISPLAYSURF)
                 self.playerGroup.add(tempPlayer)
                 self.playerSprite = tempPlayer
-                self.playerSprite.rect.update(self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.TILESIZE, self.TILESIZE)
+                #self.playerSprite.rect.update(self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.TILESIZE, self.TILESIZE)
                 self.playerX = self.tileList[pointy][pointx].x
                 self.playerY = self.tileList[pointy][pointx].y
                 for y in range(pointy - self.borderWidth, pointy + self.borderWidth):
@@ -510,14 +682,28 @@ class main():
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
             if self.tileList[pointy][pointx].isRoom == True and self.tileList[pointy][pointx].isPlayer == False and self.tileList[pointy][pointx].isEnemy == False:
-                tempEnemy= Enemy(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Enemy, 60, 15, 30, 800)
+                while True:
+                    tempHealth = int(random.random() * self.maxEnemyHealth) + 1
+                    if tempHealth >= self.minEnemyHealth and tempHealth <= self.maxEnemyHealth:
+                        break
+                while True:
+                    tempDamage = int(random.random() * self.maxEnemyDamage) + 1
+                    if tempDamage >= self.minEnemyDamage and tempDamage <= self.maxEnemyDamage:
+                        break
+                tempEnemy= Enemy(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Enemy, 60, tempDamage, tempDamage*2, 800, tempHealth)
                 self.enemyGroup.add(tempEnemy)
                 numberOfEnemies -= 1
     def drawBoard(self):
         pygame.sprite.Group.draw(self.backgroundGroup, self.boardSurface)
+        pygame.sprite.Group.draw(self.playerSprite.WeaponGroup, self.boardSurface)
         pygame.sprite.Group.draw(self.playerGroup, self.boardSurface)
         pygame.sprite.Group.draw(self.enemyGroup, self.boardSurface)
+        pygame.sprite.Group.draw(self.playerSprite.laserGroup, self.boardSurface)
         self.DISPLAYSURF.blit(self.boardSurface, (int(self.DISPLAYWIDTH/ 2) * self.TILESIZE - (self.playerX*self.TILESIZE), int(self.DISPLAYHEIGHT/2) * self.TILESIZE - (self.playerY*self.TILESIZE)))
+        clockSurfaceObj = self.healthObj.render("Health: " + str(self.playerSprite.health), True, (255, 255, 255))
+        self.DISPLAYSURF.blit(clockSurfaceObj, (330, 15))
+        clockSurfaceObj = self.healthObj.render("Shots Left: " + str(int(self.playerSprite.harmedCount/5)), True, (255, 255, 255))
+        self.DISPLAYSURF.blit(clockSurfaceObj, (318, 38))
     def restart(self):
         self.createdBoard = False
         self.tileList = []
@@ -543,17 +729,9 @@ class main():
             self.canSprint = True
         if self.canGoUp == True or self.canGoDown == True:
             if self.canGoUp == True and self.canGoDown == False:
-                if self.playerSprite.direction != "UP" and self.changed == False:
-                    self.playerSprite.direction = "UP"
-                    self.playerSprite.redrawPlayer()
-                    self.changed = True
                 self.playerY -= self.speed
                 self.playerSprite.movePlayer(0, -self.speed * self.TILESIZE)
             if self.canGoDown == True and self.canGoUp == False :
-                if self.playerSprite.direction != "DOWN" and self.changed == False:
-                    self.playerSprite.direction = "DOWN"
-                    self.playerSprite.redrawPlayer()
-                    self.changed = True
                 self.playerY += self.speed
                 self.playerSprite.movePlayer(0, self.speed * self.TILESIZE)
             spriteGroup = spritecollide(self.playerSprite, self.enemyGroup, False)
@@ -578,17 +756,9 @@ class main():
                     break
         if self.canGoLeft == True or self.canGoRight == True:
             if self.canGoLeft == True and self.canGoRight == False:
-                if self.playerSprite.direction != "LEFT" and self.changed == False:
-                    self.playerSprite.direction = "LEFT"
-                    self.playerSprite.redrawPlayer()
-                    self.changed = True
                 self.playerX -= self.speed
                 self.playerSprite.movePlayer(-self.speed * self.TILESIZE, 0)
             if self.canGoRight == True and self.canGoLeft == False:
-                if self.playerSprite.direction != "RIGHT" and self.changed == False:
-                    self.playerSprite.direction = "RIGHT"
-                    self.playerSprite.redrawPlayer()
-                    self.changed = True
                 self.playerX += self.speed
                 self.playerSprite.movePlayer(self.speed * self.TILESIZE, 0)
             spriteGroup = spritecollide(self.playerSprite, self.enemyGroup, False)
