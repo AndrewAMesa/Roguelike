@@ -233,28 +233,35 @@ class Enemy(Sprite):
                     dirvect.x *= self.speed * self.BOXSIZE
             else:
                 dirvect = pygame.math.Vector2(player.rect.centerx - self.rect.centerx, player.rect.centery - self.rect.centery)
-                print(dirvect.y)
-                print(self.movingDirection)
             if self.randomlyMoving == True:
                 self.rotateimage()
             elif self.charging == False and self.repositioning == False:
                 self.changeimage(dirvect)
             if ((dirvect.x != 0 or dirvect.y != 0) and (abs(dirvect.x) <= distanceToPlayer * self.BOXSIZE + 1 and abs(dirvect.y) <= distanceToPlayer * self.BOXSIZE + 1)) or self.charging == True or self.repositioning == True or self.randomlyMoving == True:
                 if self.randomlyMoving == True and self.isCrazy == False:
-                    tempCheck = int(random.random() * 3) + 1
-                    if tempCheck == 1:
-                        self.randomMovementX = .2 * self.BOXSIZE
-                    elif tempCheck == 2:
-                        self.randomMovementX = .2 * self.BOXSIZE * -1
-                    else:
-                        self.randomMovementX = 0
-                    tempCheck = int(random.random() * 3) + 1
-                    if tempCheck == 1:
-                        self.randomMovementY = .2 * self.BOXSIZE
-                    elif tempCheck == 2:
-                        self.randomMovementY = .2 * self.BOXSIZE * -1
-                    elif tempCheck == 3 and self.randomMovementX != 0:
-                        self.randomMovementY = 0
+                    while True:
+                        tempCheck = int(random.random() * 3 + 1)
+                        if tempCheck == 1:
+                            self.randomMovementX = .2 * self.BOXSIZE
+                            break
+                        elif tempCheck == 2:
+                            self.randomMovementX = .2 * self.BOXSIZE * -1
+                            break
+                        else:
+                            self.randomMovementX = 0
+                            break
+                    while True:
+                        tempCheck = int(random.random() * 3 + 1)
+                        if tempCheck == 1:
+                            self.randomMovementY = .2 * self.BOXSIZE
+                            break
+                        elif tempCheck == 2:
+                            self.randomMovementY = .2 * self.BOXSIZE * -1
+                            break
+                        elif tempCheck == 3 and self.randomMovementX != 0:
+                            self.randomMovementY = 0
+                            break
+
                     self.isCrazy = True
                 elif self.charging == False and self.repositioning == False and self.randomlyMoving == False:
                     if self.movingDirection == "UP" or self.movingDirection == "DOWN":
@@ -307,7 +314,7 @@ class Enemy(Sprite):
                             self.repositioning = True
                         else:
                             self.rotationCount += 1
-                        if self.rotationCount == 10:
+                        if self.rotationCount >= 10:
                             self.rotationCount = 0
                             self.randomlyMoving = False
                             self.repositioning = True
@@ -418,6 +425,7 @@ class Player(Sprite):
         self.laserY = self.rect.y
         self.laserDamage = 30
         self.harmedCount = 5
+        self.killedBoss = False
     def movePlayer(self, x, y):
         self.rect.x = self.rect.x + x
         self.rect.y = self.rect.y + y
@@ -459,6 +467,8 @@ class Player(Sprite):
                         spriteGroup[y].health -= self.laserDamage
                         spriteGroup[y].isCrazy = True
                 if spriteGroup[y].health <= 0:
+                    if spriteGroup[y].isBoss:
+                        self.killedBoss = True
                     spriteGroup[y].kill()
                 spriteList[x].kill()
             spriteGroup = spritecollide(spriteList[x], backgroundGroup, False)
@@ -510,7 +520,10 @@ class Player(Sprite):
                             spriteGroup[x].isCrazy = True
                             spriteGroup[x].health -= self.swordDamage
                 if spriteGroup[x].health <= 0:
+                    if spriteGroup[x].isBoss:
+                        self.killedBoss = True
                     spriteGroup[x].kill()
+
             if self.attacking == False:
                 for x in range(len(self.harmedGroup)):
                     self.harmedGroup[x].hurt = False
@@ -590,9 +603,6 @@ class main():
     TILESIZE = 30
     fpsClock = pygame.time.Clock()
     milliseconds = 0
-    score = 0
-    highScore = 0
-    boardSprites = ""
     tileList = []
     centerArray = []
     centerArrayNumber = 0
@@ -604,11 +614,16 @@ class main():
     canGoRight = False
     canGoLeft = False
     speed = .5
+    levelNumber = 0
+
     #boolean
     createdBoard = False
     playable = False
     canSprint = True
     sprinting = False
+    gameMode = ""
+    moveOn = False
+    dead = False
 
     #player
     player = ""
@@ -617,13 +632,19 @@ class main():
     healthObj = pygame.font.Font('freesansbold.ttf', 20)
 
     #Board Config
-    minXLength = 10
-    maxXlength = 11
-    minYLength = 10
-    maxYlength = 11
-    borderWidth = int(DISPLAYWIDTH/2)
-    roomNumberMin = 5
+    minXLength = 4
+    maxXlength = 7
+    minYLength = 4
+    maxYlength = 7
+    roomNumberMin = 6
     roomNumberMax = 10
+    bossMinXLength = 10
+    bossMaxXlength = 14
+    bossMinYLength = 10
+    bossMaxYlength = 14
+    bossRoomNumberMin = 3
+    bossRoomNumberMax = 4
+    borderWidth = int(DISPLAYWIDTH / 2)
     hallWayRandomMove = 1
     minHallwayLength = 4
     chanceOfDoubleHallway = 0
@@ -631,15 +652,20 @@ class main():
 
     #Enemy Config
     maxFollowDistance = 10
-    minNumberOfEnemies = 1
-    maxNumberOfEnemies = 2
+    minNumberOfEnemies = 6
+    maxNumberOfEnemies = 10
+    bossMinNumberOfEnemies = 2
+    bossMaxNumberOfEnemies = 4
     minEnemyDamage = 20
     maxEnemyDamage = 40
     minEnemyHealth = 40
     maxEnemyHealth = 80
+    bossHealth = 500
+    bossDamage = 80
 
     #SpriteGroups
     playerSprite = pygame.sprite
+    bossSprite = pygame.sprite
     playerGroup = pygame.sprite.Group()
     backgroundGroup = pygame.sprite.Group()
     enemyGroup = pygame.sprite.Group()
@@ -656,6 +682,13 @@ class main():
         while True:
             # Creating board
             while self.createdBoard == False:
+                self.levelNumber += 1
+                tempCheck = int(random.random() * 3 + 1)
+                if tempCheck <= 2:
+                    self.gameMode = "ENEMY"
+                elif tempCheck == 3:
+                    self.gameMode = "BOSS"
+                print(self.gameMode)
                 self.createBoard()
                 self.drawBoard()
                 self.createdBoard = True
@@ -674,8 +707,6 @@ class main():
                         if pygame.mouse.get_pressed(3) == (False, False, True) and self.playerSprite.attacking == False:
                             self.playerSprite.attackLaser()
                     elif event.type == KEYDOWN:
-                            if event.key == pygame.K_RETURN:
-                                self.restart()
                             if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                                 self.canGoLeft = True
                             if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
@@ -684,7 +715,7 @@ class main():
                                 self.canGoUp = True
                             if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                                 self.canGoDown = True
-                            if event.key == pygame.K_LSHIFT and self.canSprint == True:
+                            if event.key == pygame.K_LSHIFT and self.canSprint == True and self.gameMode != "BOSS":
                                 self.milliseconds = 0
                                 self.sprinting = True
                                 self.speed = 1
@@ -700,17 +731,41 @@ class main():
                         if event.key == pygame.K_LSHIFT:
                             self.sprinting = False
                             self.speed = .5
-            if self.playerSprite.health <= 0:
-                self.restart()
-            self.move()
+            else:
+                for event in pygame.event.get():
+                    if event.type == QUIT:
+                        pygame.quit()
+                        sys.exit()
+                    elif event.type == KEYDOWN:
+                        if event.key == pygame.K_RETURN:
+                            self.restart()
             #Updating board
             if self.playable == True:
+                self.move()
                 self.playerSprite.attackSword(self.enemyGroup, self.backgroundGroup)
                 if self.playerSprite.attacking == False:
                     self.playerSprite.findAttackDirection()
                 self.playerSprite.movingLaser(self.enemyGroup, self.backgroundGroup)
                 self.drawBoard()
                 pygame.display.update()
+                if self.playerSprite.health <= 0 and self.playerSprite.attacking == False:
+                    self.levelNumber = 0
+                    self.playable = False
+                    self.dead = True
+                    self.drawBoard()
+                    pygame.display.update()
+                elif self.gameMode == "BOSS" and self.playerSprite.attacking == False:
+                    if self.playerSprite.killedBoss == True:
+                        self.playable = False
+                        self.moveOn = True
+                        self.drawBoard()
+                        pygame.display.update()
+                elif self.gameMode == "ENEMY" and self.playerSprite.attacking == False:
+                    if len(self.enemyGroup) == 0:
+                        self.playable = False
+                        self.moveOn = True
+                        self.drawBoard()
+                        pygame.display.update()
             self.fpsClock.tick(30)
             self.milliseconds += self.fpsClock.tick_busy_loop(60)
     def createBoard(self):
@@ -725,27 +780,45 @@ class main():
                 self.tileList[y][x] = tile(self.TILESIZE, tempLeft, tempTop, self.Wall, x, y)
                 self.tileList[y][x].isWall = True
         while True:
-            roomAmount = int ((random.random()* self.roomNumberMax) + 1)
-            if roomAmount >= self.roomNumberMin and roomAmount <= self.roomNumberMax:
+            print("in loop 1")
+            if self.gameMode == "BOSS":
+                tempRoomMin = self.bossRoomNumberMin
+                tempRoomMax = self.bossRoomNumberMax
+            else:
+                tempRoomMin = self.roomNumberMin
+                tempRoomMax = self.roomNumberMax
+            roomAmount = int (random.random()* tempRoomMax + 1)
+            if roomAmount >= tempRoomMin and roomAmount <= tempRoomMax:
                 break
         tempNumber = 0
         while roomAmount > 0:
+            print("in loop 2")
+            if self.gameMode == "BOSS":
+                tempXMax = self.bossMaxXlength
+                tempXMin = self.bossMinXLength
+                tempYMax = self.bossMaxYlength
+                tempYMin = self.bossMinYLength
+            else:
+                tempXMax = self.maxXlength
+                tempXMin = self.minXLength
+                tempYMax = self.maxYlength
+                tempYMin = self.minYLength
             while True:
-                xStart = int((random.random()* (self.BOARDWIDTH - self.maxXlength - self.borderWidth)))
+                xStart = int((random.random()* (self.BOARDWIDTH - tempXMax - self.borderWidth)))
                 if xStart > self.borderWidth + 1 and xStart < self.BOARDWIDTH - self.borderWidth - 1:
                     break
             while True:
-                yStart = int((random.random()* (self.BOARDHEIGHT - self.maxYlength - self.borderWidth)))
+                yStart = int((random.random()* (self.BOARDHEIGHT - tempYMax - self.borderWidth)))
                 if yStart > self.borderWidth + 1 and yStart < self.BOARDHEIGHT - self.borderWidth - 1:
                     break
             while True:
-                xEnd = int ((random.random()* (self.maxXlength) + 1))
-                if xEnd >= self.minXLength and xEnd <= self.maxXlength:
+                xEnd = int ((random.random()* (tempXMax) + 1))
+                if xEnd >= tempXMin and xEnd <= tempXMax:
                     xEnd = xStart + xEnd
                     break
             while True:
-                yEnd = int (random.random()* (self.maxYlength) + 1)
-                if yEnd >= self.minYLength and yEnd <= self.maxYlength:
+                yEnd = int (random.random()* (tempYMax) + 1)
+                if yEnd >= tempYMin and yEnd <= tempYMax:
                     yEnd = yStart + yEnd
                     break
             tempCheck = False
@@ -764,6 +837,7 @@ class main():
                     for y in range(yStart, yEnd):
                         yLegnth -= 1
                         for x in range(xStart, xEnd):
+                            print(xLength)
                             if yLegnth == 0:
                                 xLength -= 1
                             self.tileList[y][x].image = self.Floor
@@ -775,7 +849,7 @@ class main():
                                 self.centerArrayNumber += 1
                                 self.tileList[y][x].isBossStart = True
                     roomAmount -= 1
-                if tempNumber == 3:
+                if tempNumber >= 3:
                     roomAmount -= 1
                     tempNumber = 0
         tempNumber = 1
@@ -861,8 +935,8 @@ class main():
             if self.tileList[pointy][pointx].isRoom == True:
                 self.tileList[pointy][pointx].isPlayer = True
                 tempPlayer = Player(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Player, self.DISPLAYSURF)
-                self.playerGroup.add(tempPlayer)
                 self.playerSprite = tempPlayer
+                self.playerGroup.add(tempPlayer)
                 self.playerX = self.tileList[pointy][pointx].x
                 self.playerY = self.tileList[pointy][pointx].y
                 for y in range(pointy - self.borderWidth, pointy + self.borderWidth):
@@ -870,49 +944,87 @@ class main():
                         self.tileList[y][x].isPlayer = True
                 break
         while True:
-            numberOfEnemies = int(random.random()*10) + 1
-            if numberOfEnemies >= self.minNumberOfEnemies and numberOfEnemies <= self.maxNumberOfEnemies:
+            print("in loop 3")
+            if self.gameMode == "BOSS":
+                enemyMax = self.bossMaxNumberOfEnemies
+                enemyMin = self.bossMinNumberOfEnemies
+            else:
+                enemyMax = self.maxNumberOfEnemies
+                enemyMin = self.minNumberOfEnemies
+            numberOfEnemies = int(random.random()*enemyMax + 1)
+            if numberOfEnemies >= enemyMin and numberOfEnemies <= enemyMax:
                 break
         while numberOfEnemies > 0:
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
             if self.tileList[pointy][pointx].isFloor == True and self.tileList[pointy][pointx].isPlayer == False and self.tileList[pointy][pointx].isEnemy == False:
                 while True:
-                    tempHealth = int(random.random() * self.maxEnemyHealth) + 1
+                    tempHealth = int(random.random() * self.maxEnemyHealth + 1)
                     if tempHealth >= self.minEnemyHealth and tempHealth <= self.maxEnemyHealth:
                         break
                 while True:
-                    tempDamage = int(random.random() * self.maxEnemyDamage) + 1
+                    tempDamage = int(random.random() * self.maxEnemyDamage + 1)
                     if tempDamage >= self.minEnemyDamage and tempDamage <= self.maxEnemyDamage:
                         break
                 tempEnemy= Enemy(self.TILESIZE, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Enemy, 60, tempDamage, tempDamage*2, 800, tempHealth, False)
+                self.tileList[pointy][pointx].isEnemy = True
                 self.enemyGroup.add(tempEnemy)
                 numberOfEnemies -= 1
-        while True:
-            tempCheck = False
-            pointx = int(random.random()*self.BOARDWIDTH)
-            pointy = int(random.random()*self.BOARDHEIGHT)
-            for y in range(pointy, pointy + 1):
-                for x in range(pointx, pointx + 1):
-                    if self.tileList[y][x].isRoom == False or self.tileList[y][x].isBossStart == False or self.tileList[y][x].isPlayer == True or self.tileList[y][x].isEnemy == True or self.tileList[y][x].isWall == True:
-                        tempCheck = True
-            if tempCheck == False:
-                break
-        tempEnemy= Enemy(self.TILESIZE * 2, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Boss, 60, 80, 80*2, 400, 80, True)
-        tempEnemy.isBoss = True
-        self.enemyGroup.add(tempEnemy)
+        if self.gameMode == "BOSS":
+            while True:
+                tempCheck = False
+                pointx = int(random.random()*self.BOARDWIDTH)
+                pointy = int(random.random()*self.BOARDHEIGHT)
+                for y in range(pointy, pointy + 1):
+                    for x in range(pointx, pointx + 1):
+                        if self.tileList[y][x].isRoom == False or self.tileList[y][x].isBossStart == False or self.tileList[y][x].isPlayer == True or self.tileList[y][x].isEnemy == True or self.tileList[y][x].isWall == True:
+                            tempCheck = True
+                if tempCheck == False:
+                    break
+            tempEnemy= Enemy(self.TILESIZE * 2, self.tileList[pointy][pointx].left, self.tileList[pointy][pointx].top, self.Boss, 60, self.bossDamage, self.bossDamage *2, 400, self.bossHealth, True)
+            tempEnemy.isBoss = True
+            self.bossSprite = tempEnemy
+            self.enemyGroup.add(tempEnemy)
     def drawBoard(self):
-        pygame.sprite.Group.draw(self.backgroundGroup, self.boardSurface)
-        pygame.sprite.Group.draw(self.playerSprite.WeaponGroup, self.boardSurface)
-        pygame.sprite.Group.draw(self.playerGroup, self.boardSurface)
-        pygame.sprite.Group.draw(self.enemyGroup, self.boardSurface)
-        pygame.sprite.Group.draw(self.playerSprite.laserGroup, self.boardSurface)
-        self.DISPLAYSURF.blit(self.boardSurface, (int(self.DISPLAYWIDTH/ 2) * self.TILESIZE - (self.playerX*self.TILESIZE), int(self.DISPLAYHEIGHT/2) * self.TILESIZE - (self.playerY*self.TILESIZE)))
-        clockSurfaceObj = self.healthObj.render("Health: " + str(self.playerSprite.health), True, (255, 255, 255))
-        self.DISPLAYSURF.blit(clockSurfaceObj, (330, 15))
-        clockSurfaceObj = self.healthObj.render("Shots Left: " + str(int(self.playerSprite.harmedCount/5)), True, (255, 255, 255))
-        self.DISPLAYSURF.blit(clockSurfaceObj, (318, 38))
+        if self.dead == True:
+            self.DISPLAYSURF.fill((0,0,0))
+            self.healthObj = pygame.font.Font('freesansbold.ttf', 30)
+            clockSurfaceObj = self.healthObj.render("You have Lost!", True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (127, int(self.DISPLAYSURF.get_width()/2 - 40)))
+            clockSurfaceObj = self.healthObj.render("Click Enter to Restart", True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (72, int(self.DISPLAYSURF.get_width() / 2 - 5)))
+        elif self.moveOn == True:
+            self.DISPLAYSURF.fill((0,0,0))
+            self.healthObj = pygame.font.Font('freesansbold.ttf', 30)
+            clockSurfaceObj = self.healthObj.render("You won that level!", True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (93, int(self.DISPLAYSURF.get_width()/2 - 40)))
+            clockSurfaceObj = self.healthObj.render("Click Enter to Move on", True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (63, int(self.DISPLAYSURF.get_width() / 2 - 5)))
+        else:
+            pygame.sprite.Group.draw(self.backgroundGroup, self.boardSurface)
+            pygame.sprite.Group.draw(self.playerSprite.WeaponGroup, self.boardSurface)
+            pygame.sprite.Group.draw(self.playerGroup, self.boardSurface)
+            pygame.sprite.Group.draw(self.enemyGroup, self.boardSurface)
+            pygame.sprite.Group.draw(self.playerSprite.laserGroup, self.boardSurface)
+            self.DISPLAYSURF.blit(self.boardSurface, (int(self.DISPLAYWIDTH/ 2) * self.TILESIZE - (self.playerX*self.TILESIZE), int(self.DISPLAYHEIGHT/2) * self.TILESIZE - (self.playerY*self.TILESIZE)))
+            clockSurfaceObj = self.healthObj.render("Health: " + str(self.playerSprite.health), True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (330, 8))
+            clockSurfaceObj = self.healthObj.render("Shots Left: " + str(int(self.playerSprite.harmedCount/5)), True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (318, 31))
+            clockSurfaceObj = self.healthObj.render("Level: " + str(self.levelNumber), True,(255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (8, 8))
+            if self.gameMode == "ENEMY":
+                clockSurfaceObj = self.healthObj.render("Enemies Left: " + str(len(self.enemyGroup)), True,
+                                                        (255, 255, 255))
+                self.DISPLAYSURF.blit(clockSurfaceObj, (8, 31))
+            elif self.gameMode == "BOSS":
+                if self.bossSprite.health < 0:
+                    self.bossSprite.health = 0
+                clockSurfaceObj = self.healthObj.render("Boss Health: " + str(self.bossSprite.health), True,
+                                                        (255, 255, 255))
+                self.DISPLAYSURF.blit(clockSurfaceObj, (8, 31))
     def restart(self):
+        self.healthObj = pygame.font.Font('freesansbold.ttf', 20)
         self.createdBoard = False
         self.tileList = []
         self.centerArray = []
@@ -922,8 +1034,12 @@ class main():
         self.enemyGroup = pygame.sprite.Group()
         self.playerX = 0
         self.playerY = 0
-        self.player = ""
+        self.playerSprite = pygame.sprite
         self.playable = False
+        self.DISPLAYSURF = pygame.display.set_mode((self.DISPLAYWIDTH * self.TILESIZE, self.DISPLAYHEIGHT * self.TILESIZE))
+        self.boardSurface = pygame.Surface((self.BOARDWIDTH * self.TILESIZE, self.BOARDHEIGHT * self.TILESIZE))
+        self.dead = False
+        self.moveOn = False
     def move(self):
         enemySprites = self.enemyGroup.sprites()
         for x in range(len(enemySprites)):
