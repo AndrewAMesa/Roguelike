@@ -79,6 +79,7 @@ class Enemy(Sprite):
         self.repositioning = False
         self.repositionDirvectX = -1
         self.repositionDirvectY = -1
+        self.keepGoing = 0
     def moveTowardsPlayer(self, player, backgroundGroup, distanceToPlayer, maxFollowDistance):
         self.milliseconds += self.fpsClock.tick_busy_loop(60)
         if self.milliseconds > self.moveTime:
@@ -209,13 +210,23 @@ class Enemy(Sprite):
             if self.repositioning == True:
                 self.isStunned = False
                 dirvect = pygame.math.Vector2(self.originalPositionX - self.rect.centerx, self.originalPositionY - self.rect.centery)
-                if abs(dirvect.x) == 0 and abs(dirvect.y) == 0:
-                    self.repositioning = False
-                    self.charging = False
-                    if self.isCrazy == True:
-                        self.isCrazy = False
-                        self.randomlyMoving = True
-                    return
+                if abs(dirvect.x) == 0 and abs(dirvect.y) == 0 or self.keepGoing > 0:
+                    if pygame.sprite.collide_rect(self, player) or self.keepGoing > 0:
+                        if self.keepGoing == 0:
+                            player.health -= self.damage
+                        self.keepGoing += 1
+                        self.rect.x += 1 * self.BOXSIZE * self.speed
+                        self.rect.y += 1 * self.BOXSIZE * self.speed
+                        if self.keepGoing >= 10:
+                            self.keepGoing = 0
+                        return
+                    else:
+                        self.repositioning = False
+                        self.charging = False
+                        if self.isCrazy == True:
+                            self.isCrazy = False
+                            self.randomlyMoving = True
+                        return
                 else:
                     if dirvect.y < 0:
                         dirvect.y = -1
@@ -242,10 +253,10 @@ class Enemy(Sprite):
                     while True:
                         tempCheck = int(random.random() * 3 + 1)
                         if tempCheck == 1:
-                            self.randomMovementX = .2 * self.BOXSIZE
+                            self.randomMovementX = .5 * self.BOXSIZE
                             break
                         elif tempCheck == 2:
-                            self.randomMovementX = .2 * self.BOXSIZE * -1
+                            self.randomMovementX = .5 * self.BOXSIZE * -1
                             break
                         else:
                             self.randomMovementX = 0
@@ -253,15 +264,14 @@ class Enemy(Sprite):
                     while True:
                         tempCheck = int(random.random() * 3 + 1)
                         if tempCheck == 1:
-                            self.randomMovementY = .2 * self.BOXSIZE
+                            self.randomMovementY = .5 * self.BOXSIZE
                             break
                         elif tempCheck == 2:
-                            self.randomMovementY = .2 * self.BOXSIZE * -1
+                            self.randomMovementY = .5 * self.BOXSIZE * -1
                             break
                         elif tempCheck == 3 and self.randomMovementX != 0:
                             self.randomMovementY = 0
                             break
-
                     self.isCrazy = True
                 elif self.charging == False and self.repositioning == False and self.randomlyMoving == False:
                     if self.movingDirection == "UP" or self.movingDirection == "DOWN":
@@ -305,12 +315,18 @@ class Enemy(Sprite):
                 spriteGroup = spritecollide(self, backgroundGroup, False)
                 for x in range(len(spriteGroup)):
                     if spriteGroup[x].isWall == True:
-                        print("in loop")
                         self.isStunned = True
                         self.rect.x += dirvect.x * -1
                         self.rect.y += dirvect.y * -1
                         if self.randomlyMoving == False and self.repositioning == False:
-                            self.moveTime = 2000
+                            personGroup = spritecollide(player, backgroundGroup, False)
+                            tempCheck = False
+                            for x in range(len(personGroup)):
+                                if personGroup[x].isRoom == False:
+                                    self.isStunned = False
+                                    tempCheck = True
+                            if tempCheck == False:
+                                self.moveTime = 2000
                             self.repositioning = True
                         else:
                             self.rotationCount += 1
@@ -638,9 +654,9 @@ class main():
     maxYlength = 7
     roomNumberMin = 6
     roomNumberMax = 10
-    bossMinXLength = 10
+    bossMinXLength = 12
     bossMaxXlength = 14
-    bossMinYLength = 10
+    bossMinYLength = 12
     bossMaxYlength = 14
     bossRoomNumberMin = 3
     bossRoomNumberMax = 4
@@ -656,12 +672,14 @@ class main():
     maxNumberOfEnemies = 10
     bossMinNumberOfEnemies = 2
     bossMaxNumberOfEnemies = 4
+    findMinNumberOfEnemies = 3
+    findMaxNumberOfEnemies = 4
     minEnemyDamage = 20
     maxEnemyDamage = 40
     minEnemyHealth = 40
     maxEnemyHealth = 80
-    bossHealth = 500
-    bossDamage = 80
+    bossHealth = 400
+    bossDamage = 60
 
     #SpriteGroups
     playerSprite = pygame.sprite
@@ -780,7 +798,6 @@ class main():
                 self.tileList[y][x] = tile(self.TILESIZE, tempLeft, tempTop, self.Wall, x, y)
                 self.tileList[y][x].isWall = True
         while True:
-            print("in loop 1")
             if self.gameMode == "BOSS":
                 tempRoomMin = self.bossRoomNumberMin
                 tempRoomMax = self.bossRoomNumberMax
@@ -792,7 +809,6 @@ class main():
                 break
         tempNumber = 0
         while roomAmount > 0:
-            print("in loop 2")
             if self.gameMode == "BOSS":
                 tempXMax = self.bossMaxXlength
                 tempXMin = self.bossMinXLength
@@ -944,7 +960,6 @@ class main():
                         self.tileList[y][x].isPlayer = True
                 break
         while True:
-            print("in loop 3")
             if self.gameMode == "BOSS":
                 enemyMax = self.bossMaxNumberOfEnemies
                 enemyMin = self.bossMinNumberOfEnemies
@@ -1040,13 +1055,17 @@ class main():
         self.boardSurface = pygame.Surface((self.BOARDWIDTH * self.TILESIZE, self.BOARDHEIGHT * self.TILESIZE))
         self.dead = False
         self.moveOn = False
+        self.canGoUp = False
+        self.canGoDown = False
+        self.canGoRight = False
+        self.canGoLeft = False
     def move(self):
         enemySprites = self.enemyGroup.sprites()
         for x in range(len(enemySprites)):
             if enemySprites[x].isBoss == False:
                 enemySprites[x].moveTowardsPlayer(self.playerSprite, self.backgroundGroup, self.borderWidth, self.maxFollowDistance)
             else:
-                enemySprites[x].bossMoveTowardsPlayer(self.playerSprite, self.backgroundGroup, 3)
+                enemySprites[x].bossMoveTowardsPlayer(self.playerSprite, self.backgroundGroup, 3,)
         if self.milliseconds > 80 and self.sprinting == True:
             self.speed = .5
             self.canSprint = False
