@@ -66,6 +66,7 @@ class Enemy(Sprite):
         self.health = _health
         self.hurt = False
         self.isBoss = _isBoss
+        self.changeCrazy = False
         if self.isBoss == True:
             self.rect.update(self.rect.left - self.BOXSIZE/2, self.rect.top - self.BOXSIZE/2, self.BOXSIZE, self.BOXSIZE)
             self.speed = .1
@@ -97,11 +98,21 @@ class Enemy(Sprite):
                     self.randomlyMovingX = False
                     self.randomlyMovingY = False
                     self.leavingCorner = True
-                    tempCheck = int(random.random() * 2) + 1
+                    tempCheck = int(random.random() * 2 + 1)
                     if tempCheck == 1:
                         self.movingDirection = "HOR"
+                        tempCheck = int(random.random() * 2 + 1)
+                        if tempCheck == 1:
+                            self.cornerMovementX = self.speed*self.BOXSIZE * -1
+                        else:
+                            self.cornerMovementX = self.speed * self.BOXSIZE
                     else:
                         self.movingDirection = "VER"
+                        tempCheck = int(random.random() * 2 + 1)
+                        if tempCheck == 1:
+                            self.cornerMovementY = self.speed * self.BOXSIZE * -1
+                        else:
+                            self.cornerMovementY = self.speed * self.BOXSIZE
                 elif abs(dirvect.x) < self.BOXSIZE and abs(dirvect.x) > 0 and self.leavingCorner == False:
                     self.randomlyMovingX = True
                 elif abs(dirvect.y) < self.BOXSIZE and abs(dirvect.y) > 0 and self.leavingCorner == False:
@@ -130,11 +141,6 @@ class Enemy(Sprite):
                         player.health -= self.critDamage
                     self.moveTime = self.waitAttackTime
                 if self.leavingCorner == True:
-                    if self.cornerMovementY == 0 and self.cornerMovementX == 0:
-                        if self.movingDirection == "HOR":
-                            self.cornerMovementX = dirvect.x * -1
-                        else:
-                            self.cornerMovementY = dirvect.y * -1
                     if self.movingDirection == "HOR":
                         dirvect.x = self.cornerMovementX
                     else:
@@ -155,8 +161,15 @@ class Enemy(Sprite):
                         self.canGoVerticle = False
                         if self.movingDirection == "VER":
                             self.leavingCorner = False
-                            self.cornerMovementY = 0
+                            self.canGoVerticle = False
+                            self.canGoHorizontal = False
                             self.movingDirection = ""
+                            return
+                        elif dirvect.x == 0 and self.movingDirection == "":
+                            print("in loop")
+                            self.canGoHorizontal = False
+                            self.cornerMovementX = 0
+                            self.leavingCorner = False
                         break
                     elif x == len(spriteGroup) - 1:
                         if self.movingDirection == "HOR":
@@ -172,7 +185,6 @@ class Enemy(Sprite):
                         if spriteGroup[x] != self:
                             self.rect.y += dirvect.y * -1
                             self.canGoVerticle = False
-                            self.leavingCorner = False
                             break
                 self.rect.x += dirvect.x
                 spriteGroup = spritecollide(self, backgroundGroup, False)
@@ -182,8 +194,15 @@ class Enemy(Sprite):
                         self.canGoHorizontal = False
                         if self.movingDirection == "HOR":
                             self.leavingCorner = False
-                            self.cornerMovementX = 0
+                            self.canGoVerticle = False
+                            self.canGoHorizontal = False
                             self.movingDirection = ""
+                            return
+                        elif dirvect.y == 0 and self.movingDirection == "":
+                            print("in loop")
+                            self.canGoVerticle = False
+                            self.cornerMovementY = 0
+                            self.leavingCorner = False
                         break
                     elif x == len(spriteGroup) - 1:
                         if self.movingDirection == "VER":
@@ -199,7 +218,6 @@ class Enemy(Sprite):
                         if spriteGroup[x] != self:
                             self.rect.x += dirvect.x * -1
                             self.canGoHorizontal = False
-                            self.leavingCorner = False
                             break
     def bossMoveTowardsPlayer(self, player, backgroundGroup, distanceToPlayer):
         self.milliseconds += self.fpsClock.tick_busy_loop(60)
@@ -311,12 +329,10 @@ class Enemy(Sprite):
                     dirvect.y = self.randomMovementY
                     dirvect.x = self.randomMovementX
                 self.rect.y += dirvect.y
-                self.rect.x += dirvect.x
                 spriteGroup = spritecollide(self, backgroundGroup, False)
                 for x in range(len(spriteGroup)):
                     if spriteGroup[x].isWall == True:
                         self.isStunned = True
-                        self.rect.x += dirvect.x * -1
                         self.rect.y += dirvect.y * -1
                         if self.randomlyMoving == False and self.repositioning == False:
                             personGroup = spritecollide(player, backgroundGroup, False)
@@ -328,14 +344,47 @@ class Enemy(Sprite):
                             if tempCheck == False:
                                 self.moveTime = 2000
                             self.repositioning = True
+                            self.charging = False
                         else:
-                            self.rotationCount += 1
+                            if self.changeCrazy == True:
+                                self.rotationCount += 1
+                                self.isCrazy = False
+                                self.changeCrazy = False
+                            else:
+                                self.changeCrazy = True
                         if self.rotationCount >= 10:
                             self.rotationCount = 0
                             self.randomlyMoving = False
                             self.repositioning = True
-                        self.charging = False
-                        self.isCrazy = False
+                        break
+                self.rect.x += dirvect.x
+                spriteGroup = spritecollide(self, backgroundGroup, False)
+                for x in range(len(spriteGroup)):
+                    if spriteGroup[x].isWall == True:
+                        self.isStunned = True
+                        self.rect.x += dirvect.x * -1
+                        if self.randomlyMoving == False and self.repositioning == False:
+                            personGroup = spritecollide(player, backgroundGroup, False)
+                            tempCheck = False
+                            for x in range(len(personGroup)):
+                                if personGroup[x].isRoom == False:
+                                    self.isStunned = False
+                                    tempCheck = True
+                            if tempCheck == False:
+                                self.moveTime = 2000
+                            self.repositioning = True
+                            self.charging = False
+                        else:
+                            if self.changeCrazy == True:
+                                self.rotationCount += 1
+                                self.isCrazy = False
+                                self.changeCrazy = False
+                            else:
+                                self.changeCrazy = True
+                        if self.rotationCount >= 10:
+                            self.rotationCount = 0
+                            self.randomlyMoving = False
+                            self.repositioning = True
                         break
                 if pygame.sprite.collide_rect(self, player):
                     if self.charging == True or self.randomlyMoving == True:
@@ -527,12 +576,14 @@ class Player(Sprite):
             for x in range(len(spriteGroup)):
                 self.harmedGroup = spriteGroup
                 if spriteGroup[x].hurt == False:
-                    self.harmedCount += 1
+
                     spriteGroup[x].hurt = True
                     if spriteGroup[x].isBoss == False:
                         spriteGroup[x].health -= self.swordDamage
+                        self.harmedCount += 1
                     else:
                         if spriteGroup[x].isStunned == True:
+                            self.harmedCount += 1
                             spriteGroup[x].isCrazy = True
                             spriteGroup[x].health -= self.swordDamage
                 if spriteGroup[x].health <= 0:
@@ -701,10 +752,10 @@ class main():
             # Creating board
             while self.createdBoard == False:
                 self.levelNumber += 1
-                tempCheck = int(random.random() * 3 + 1)
-                if tempCheck <= 2:
+                tempCheck = int(random.random() * 2 + 1)
+                if tempCheck == 1:
                     self.gameMode = "ENEMY"
-                elif tempCheck == 3:
+                elif tempCheck == 2:
                     self.gameMode = "BOSS"
                 print(self.gameMode)
                 self.createBoard()
@@ -853,7 +904,6 @@ class main():
                     for y in range(yStart, yEnd):
                         yLegnth -= 1
                         for x in range(xStart, xEnd):
-                            print(xLength)
                             if yLegnth == 0:
                                 xLength -= 1
                             self.tileList[y][x].image = self.Floor
