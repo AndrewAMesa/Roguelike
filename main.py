@@ -39,10 +39,32 @@ class tile(Sprite):
         self.x = _x
         self.y = _y
         self.isBossStart = False
+        self.fpsClock = pygame.time.Clock()
+        self.milliseconds = 0
+        self.permanentImage = pygame.image.load("images/charge.png")
+        self.SparkImage = pygame.image.load("images/spark.png")
+        self.laserImage = ""
+
     def drawTile(self, DISPLAYSURF):
         self.TILESURF.blit(self.image, (0,0))
         self.TILESURF.set_colorkey((255, 255, 255))
         DISPLAYSURF.blit(self.TILESURF, (self.left, self.top))
+    def runningSparks(self, enemyGroup, player):
+        self.image = self.SparkImage
+        spriteGroup = spritecollide(self, enemyGroup, False)
+        for x in range(len(spriteGroup)):
+            spriteGroup[x].health -= 5
+            if spriteGroup[x].health <= 0:
+                spriteGroup[x].kill()
+        if pygame.sprite.collide_rect(self, player) == True:
+            player.health -= 10
+    def runningLaser(self, enemyGroup):
+        self.image = self.laserImage
+        spriteGroup = spritecollide(self, enemyGroup, False)
+        for x in range(len(spriteGroup)):
+            spriteGroup[x].health -= 40
+            if spriteGroup[x].health <= 0:
+                spriteGroup[x].kill()
 class Enemy(Sprite):
     def __init__(self, _BOXSIZE, _left, _top, _image, _moveTime, _damage, _critDamage, _waitAttack, _health, _isBoss):
         pygame.sprite.Sprite.__init__(self)
@@ -688,7 +710,7 @@ class main():
     canGoRight = False
     canGoLeft = False
     speed = .5
-    levelNumber = 0
+    levelNumber = 1
 
     #boolean
     createdBoard = False
@@ -699,6 +721,10 @@ class main():
     moveOn = False
     dead = False
     onPortal = False
+    sparkGoing = False
+    onButton = False
+    spawningTraps = True
+    buttonTick = 0
 
     #player
     player = ""
@@ -708,9 +734,9 @@ class main():
 
     #Board Config
     minXLength = 4
-    maxXlength = 7
+    maxXlength = 8
     minYLength = 4
-    maxYlength = 7
+    maxYlength = 8
     roomNumberMin = 6
     roomNumberMax = 10
     bossMinXLength = 11
@@ -726,15 +752,16 @@ class main():
     roomGap = 2
 
     #Collectables
-    minNumberHealthPack = 3
-    maxNumberHealthPack = 4
-    minNumberDamagePack = 3
-    maxNumberDamagePack = 4
-    minNumberMines = 3
-    maxNumberMines = 4
+    minNumberHealthPack = 2
+    maxNumberHealthPack = 3
+    minNumberDamagePack = 2
+    maxNumberDamagePack = 3
+    minNumberMines = 2
+    maxNumberMines = 3
     minNumberTraps = 3
     maxNumberTraps = 5
     clickAmount = 3
+    clickAmount2 = 1
 
     #Enemy Config
     maxFollowDistance = 10
@@ -744,20 +771,22 @@ class main():
     bossMaxNumberOfEnemies = 4
     findMinNumberOfEnemies = 5
     findMaxNumberOfEnemies = 7
-    minEnemyDamage = 20
-    maxEnemyDamage = 40
-    minEnemyHealth = 40
-    maxEnemyHealth = 80
-    bossHealth = 400
-    bossDamage = 60
+    minEnemyDamage = 10
+    maxEnemyDamage = 30
+    minEnemyHealth = 30
+    maxEnemyHealth = 50
+    bossHealth = 280
+    bossDamage = 10
 
     #SpriteGroups
     playerSprite = pygame.sprite
     portalSprite = pygame.sprite
     bossSprite = pygame.sprite
+    buttonSprite = pygame.sprite
     playerGroup = pygame.sprite.Group()
     backgroundGroup = pygame.sprite.Group()
     enemyGroup = pygame.sprite.Group()
+    sparkGroup = pygame.sprite.Group()
 
     #Images
     Floor = pygame.image.load("images/Floor.png")
@@ -772,26 +801,29 @@ class main():
     Damager = pygame.image.load("images/Mine.png")
     Button = pygame.image.load("images/Button.png")
     Charge = pygame.image.load("images/charge.png")
+    Button2 = pygame.image.load("images/Button2.png")
+    Corner = pygame.image.load("images/Corner.png")
+    CornerL = pygame.image.load("images/laserCorner.png")
+    SideL = pygame.image.load("images/laserSide.png")
 
     def main(self):
         while True:
             # Creating board
             while self.createdBoard == False:
-                self.levelNumber += 1
-                tempCheck = int(random.random() * 3 + 1)
-                if tempCheck == 1:
+                tempCheck = int(random.random() * 5 + 1)
+                if tempCheck <= 3:
                     self.gameMode = "ENEMY"
-                elif tempCheck == 2:
-                    self.gameMode = "BOSS"
-                elif tempCheck == 3:
+                elif tempCheck <= 5:
                     self.gameMode = "PORTAL"
+                if self.levelNumber == 5:
+                    self.gameMode = "BOSS"
                 print(self.gameMode)
                 self.createBoard()
                 self.drawBoard()
                 self.createdBoard = True
                 self.playable = True
             # Moving character
-            if self.playable == True:
+            if self.playable == True and (self.gameMode != "PORTAL" or self.sparkGoing == False):
                 for event in pygame.event.get():
                     if event.type == QUIT:
                         pygame.quit()
@@ -839,6 +871,31 @@ class main():
             #Updating board
             if self.playable == True:
                 self.move()
+                if self.sparkGoing == True:
+                    sparkSprites = self.sparkGroup.sprites()
+                    for x in range(len(sparkSprites)):
+                        if self.gameMode == "ENEMY":
+                            sparkSprites[x].runningSparks(self.enemyGroup, self.playerSprite)
+                        else:
+                            sparkSprites[x].runningLaser(self.enemyGroup)
+                            self.canGoUp = False
+                            self.canGoDown = False
+                            self.canGoLeft = False
+                            self.canGoRight = False
+                        if (self.gameMode == "ENEMY" and self.buttonTick >= 200) or (self.gameMode == "PORTAL" and self.buttonTick >= 300):
+                            self.buttonSprite.clickAmount -= 1
+                            if self.buttonSprite.clickAmount <= 0:
+                                for y in range(len(sparkSprites)):
+                                    sparkSprites[y].image = self.Floor
+                                self.sparkGoing = False
+                                self.buttonTick = 0
+                                break
+                            else:
+                                for y in range(len(sparkSprites)):
+                                    sparkSprites[y].image = sparkSprites[y].permanentImage
+                                self.sparkGoing = False
+                                self.buttonTick = 0
+                                break
                 self.playerSprite.attackSword(self.enemyGroup, self.backgroundGroup)
                 if self.playerSprite.attacking == False:
                     self.playerSprite.findAttackDirection()
@@ -849,28 +906,36 @@ class main():
                     self.levelNumber = 0
                     self.playable = False
                     self.dead = True
+                    self.reset()
                     self.drawBoard()
                     pygame.display.update()
                 elif self.gameMode == "BOSS" and self.playerSprite.attacking == False:
                     if self.playerSprite.killedBoss == True:
+                        self.levelNumber += 1
                         self.playable = False
                         self.moveOn = True
+                        self.increaseDifficulty()
                         self.drawBoard()
                         pygame.display.update()
                 elif self.gameMode == "ENEMY" and self.playerSprite.attacking == False:
                     if len(self.enemyGroup) == 0:
+                        self.levelNumber += 1
                         self.playable = False
                         self.moveOn = True
+                        self.increaseDifficulty()
                         self.drawBoard()
                         pygame.display.update()
                 elif self.gameMode == "PORTAL" and self.playerSprite.attacking == False:
                     if self.onPortal == True:
+                        self.levelNumber += 1
                         self.playable = False
                         self.moveOn = True
+                        self.increaseDifficulty()
                         self.drawBoard()
                         pygame.display.update()
             self.fpsClock.tick(30)
             self.milliseconds += self.fpsClock.tick_busy_loop(60)
+            self.buttonTick += self.fpsClock.tick_busy_loop(60)
     def createBoard(self):
         originalRandom = self.hallWayRandomMove
         self.tileList = [[0] * self.BOARDWIDTH for x in range(self.BOARDHEIGHT)]
@@ -1170,46 +1235,89 @@ class main():
                     self.tileList[pointy][pointx].isDamager = True
                     self.tileList[pointy][pointx].isChanged = True
                     numberOfMines -= 1
-        leave = False
-        while leave == False:
-            tempCheck = False
-            pointx = int(random.random() * (self.BOARDWIDTH - 15)) + 7
-            pointy = int(random.random() * (self.BOARDHEIGHT - 15)) + 7
-            if self.tileList[pointy][pointx].isRoom == False or self.tileList[pointy][pointx].isPlayer == True or self.tileList[pointy][pointx].isWall == True or self.tileList[pointy][pointx].isChanged == True:
-                tempCheck = True
-            if tempCheck == False:
-                self.tileList[pointy][pointx].image = self.Button
-                self.tileList[pointy][pointx].isButton = True
-                self.tileList[pointy][pointx].isChanged = True
-                self.tileList[pointy][pointx].clickAmount = self.clickAmount
-                while True:
-                    numberofTraps = int(random.random()*self.maxNumberTraps + 1)
-                    if numberofTraps >= self.minNumberTraps and numberofTraps <= self.maxNumberTraps:
-                        break
-                while numberofTraps > 0:
-                    print("in loop 2")
-                    tempY = int(random.random() * 4 + 1)
-                    if int(random.random() * 2 + 1) == 2:
-                        tempY *= - 1
-                    tempX = int(random.random() * 4 + 1)
-                    if int(random.random() * 2 + 1) == 2:
-                        tempX *= - 1
-                    y = pointy + tempY
-                    x = pointx + tempX
-                    if self.tileList[y][x].isRoom == True and self.tileList[y][x].isPlayer == False and self.tileList[y][x].isWall == False and self.tileList[y][x].isChanged == False:
-                        self.tileList[y][x].isCharge = True
-                        self.tileList[y][x].image = self.Charge
-                        self.tileList[y][x].isChanged = True
-                        numberofTraps -= 1
-                leave = True
+        if self.gameMode == "ENEMY" and self.spawningTraps == True:
+            leave = False
+            while leave == False:
+                tempCheck = False
+                pointx = int(random.random() * (self.BOARDWIDTH - 15)) + 7
+                pointy = int(random.random() * (self.BOARDHEIGHT - 15)) + 7
+                if self.tileList[pointy][pointx].isRoom == False or self.tileList[pointy][pointx].isPlayer == True or self.tileList[pointy][pointx].isWall == True or self.tileList[pointy][pointx].isChanged == True:
+                    tempCheck = True
+                if tempCheck == False:
+                    self.tileList[pointy][pointx].image = self.Button
+                    self.tileList[pointy][pointx].isButton = True
+                    self.tileList[pointy][pointx].isChanged = True
+                    self.tileList[pointy][pointx].clickAmount = self.clickAmount
+                    self.buttonSprite = self.tileList[pointy][pointx]
+                    while True:
+                        numberofTraps = int(random.random()*self.maxNumberTraps + 1)
+                        if numberofTraps >= self.minNumberTraps and numberofTraps <= self.maxNumberTraps:
+                            break
+                    while numberofTraps > 0:
+                        tempY = int(random.random() * 4 + 1)
+                        if int(random.random() * 2 + 1) == 2:
+                            tempY *= - 1
+                        tempX = int(random.random() * 4 + 1)
+                        if int(random.random() * 2 + 1) == 2:
+                            tempX *= - 1
+                        y = pointy + tempY
+                        x = pointx + tempX
+                        if self.tileList[y][x].isRoom == True and self.tileList[y][x].isPlayer == False and self.tileList[y][x].isWall == False and self.tileList[y][x].isChanged == False:
+                            self.tileList[y][x].isCharge = True
+                            self.tileList[y][x].image = self.Charge
+                            self.tileList[y][x].isChanged = True
+                            self.sparkGroup.add(self.tileList[y][x])
+                            numberofTraps -= 1
+                    leave = True
+        elif self.gameMode == "PORTAL" and self.spawningTraps == True:
+            leave = False
+            while leave == False:
+                tempCheck = False
+                pointx = int(random.random() * (self.BOARDWIDTH - 15)) + 7
+                pointy = int(random.random() * (self.BOARDHEIGHT - 15)) + 7
+                for y in range(pointy - 1, pointy + 2):
+                    for x in range(pointx - 1, pointx + 2):
+                        if self.tileList[y][x].isRoom == False or self.tileList[y][
+                            x].isPlayer == True or self.tileList[y][x].isWall == True or \
+                                self.tileList[y][x].isChanged == True:
+                            tempCheck = True
+                if tempCheck == False:
+                    self.tileList[pointy][pointx].clickAmount = self.clickAmount2
+                    self.tileList[pointy][pointx].image = self.Button2
+                    self.tileList[pointy][pointx].isButton = True
+                    self.tileList[pointy][pointx].isChanged = True
+                    self.buttonSprite = self.tileList[pointy][pointx]
+                    self.tileList[pointy - 1][pointx - 1].image = self.Corner
+                    self.tileList[pointy - 1][pointx - 1].laserImage = self.CornerL
+                    self.tileList[pointy - 1][pointx + 1].image = pygame.transform.rotate(self.Corner, -90)
+                    self.tileList[pointy - 1][pointx + 1].laserImage = pygame.transform.rotate(self.CornerL, -90)
+                    self.tileList[pointy + 1][pointx - 1].image = pygame.transform.rotate(self.Corner, 90)
+                    self.tileList[pointy + 1][pointx - 1].laserImage = pygame.transform.rotate(self.CornerL, 90)
+                    self.tileList[pointy + 1][pointx + 1].image = pygame.transform.rotate(self.Corner, 180)
+                    self.tileList[pointy + 1][pointx + 1].laserImage = pygame.transform.rotate(self.CornerL, 180)
+                    self.tileList[pointy - 1][pointx].laserImage = self.SideL
+                    self.tileList[pointy + 1][pointx].laserImage = pygame.transform.rotate(self.SideL, 180)
+                    self.tileList[pointy][pointx - 1].laserImage = pygame.transform.rotate(self.SideL, 90)
+                    self.tileList[pointy][pointx + 1].laserImage = pygame.transform.rotate(self.SideL, -90)
+                    self.sparkGroup.add(self.tileList[pointy - 1][pointx - 1])
+                    self.sparkGroup.add(self.tileList[pointy - 1][pointx + 1])
+                    self.sparkGroup.add(self.tileList[pointy + 1][pointx - 1])
+                    self.sparkGroup.add(self.tileList[pointy + 1][pointx + 1])
+                    self.sparkGroup.add(self.tileList[pointy - 1][pointx])
+                    self.sparkGroup.add(self.tileList[pointy + 1][pointx])
+                    self.sparkGroup.add(self.tileList[pointy][pointx - 1])
+                    self.sparkGroup.add(self.tileList[pointy][pointx + 1])
+                    leave = True
     def drawBoard(self):
         if self.dead == True:
             self.DISPLAYSURF.fill((0,0,0))
             self.healthObj = pygame.font.Font('freesansbold.ttf', 30)
-            clockSurfaceObj = self.healthObj.render("You have Lost!", True, (255, 255, 255))
-            self.DISPLAYSURF.blit(clockSurfaceObj, (127, int(self.DISPLAYSURF.get_width()/2 - 40)))
+            clockSurfaceObj = self.healthObj.render("Game Over!", True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (139, int(self.DISPLAYSURF.get_width()/2 - 50)))
+            clockSurfaceObj = self.healthObj.render("You made it to level " + str(self.levelNumber + 1), True, (255, 255, 255))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (73, int(self.DISPLAYSURF.get_width() / 2 - 15)))
             clockSurfaceObj = self.healthObj.render("Click Enter to Restart", True, (255, 255, 255))
-            self.DISPLAYSURF.blit(clockSurfaceObj, (72, int(self.DISPLAYSURF.get_width() / 2 - 5)))
+            self.DISPLAYSURF.blit(clockSurfaceObj, (72, int(self.DISPLAYSURF.get_width() / 2 + 20)))
         elif self.moveOn == True:
             self.DISPLAYSURF.fill((0,0,0))
             self.healthObj = pygame.font.Font('freesansbold.ttf', 30)
@@ -1267,7 +1375,12 @@ class main():
         self.canGoDown = False
         self.canGoRight = False
         self.canGoLeft = False
+        self.onPortal = False
+        self.sparkGoing = False
+        self.onButton = False
+        self.buttonTick = 0
     def move(self):
+        tempOnButton = False
         enemySprites = self.enemyGroup.sprites()
         for x in range(len(enemySprites)):
             if enemySprites[x].isBoss == False:
@@ -1310,7 +1423,7 @@ class main():
                     break
                 if spriteGroup[x].isPortal == True:
                     self.onPortal = True
-                if spriteGroup[x].isHealthPack == True and (self.gameMode != "PORTAL" and self.playerSprite.health < 999) or (self.gameMode == "PORTAL" and self.playerSprite.health < 450):
+                if spriteGroup[x].isHealthPack == True and ((self.gameMode != "PORTAL" and self.playerSprite.health < 999) or (self.gameMode == "PORTAL" and self.playerSprite.health < 450)):
                     self.playerSprite.health += 50
                     if self.gameMode == "PORTAL" and self.playerSprite.health > 450:
                         self.playerSprite.health = 450
@@ -1325,6 +1438,16 @@ class main():
                     spriteGroup[x].isDamageBuff = False
                 if spriteGroup[x].isDamager == True:
                     self.playerSprite.health -= 50
+                if spriteGroup[x].isButton == True and spriteGroup[x].clickAmount > 0:
+                    if self.onButton == True:
+                        tempOnButton = True
+                    else:
+                        self.onButton = True
+                        tempOnButton = True
+                        self.sparkGoing = True
+                        self.buttonTick = 0
+            if tempOnButton == False:
+                self.onButton = False
         if self.canGoLeft == True or self.canGoRight == True:
             if self.canGoLeft == True and self.canGoRight == False:
                 self.playerX -= self.speed
@@ -1354,7 +1477,7 @@ class main():
                     break
                 if spriteGroup[x].isPortal == True:
                     self.onPortal = True
-                if spriteGroup[x].isHealthPack == True and (self.gameMode != "PORTAL" and self.playerSprite.health < 999) or (self.gameMode == "PORTAL" and self.playerSprite.health < 450):
+                if spriteGroup[x].isHealthPack == True and ((self.gameMode != "PORTAL" and self.playerSprite.health < 999) or (self.gameMode == "PORTAL" and self.playerSprite.health < 450)):
                     self.playerSprite.health += 50
                     if self.gameMode == "PORTAL" and self.playerSprite.health > 450:
                         self.playerSprite.health = 450
@@ -1369,6 +1492,113 @@ class main():
                     spriteGroup[x].isDamageBuff = False
                 if spriteGroup[x].isDamager == True:
                     self.playerSprite.health -= 50
+                if spriteGroup[x].isButton == True and spriteGroup[x].clickAmount > 0:
+                    if self.onButton == True:
+                        tempOnButton = True
+                    else:
+                        self.onButton = True
+                        tempOnButton = True
+                        self.sparkGoing = True
+                        self.buttonTick = 0
+            if tempOnButton == False:
+                self.onButton = False
+    def increaseDifficulty(self):
+        if self.levelNumber % 2 == 0:
+            if self.maxEnemyDamage < 900:
+                self.minEnemyDamage += 10
+                self.maxEnemyDamage += 10
+            self.minEnemyHealth += 10
+            self.maxEnemyHealth += 10
+            self.bossHealth += 10
+            if self.bossDamage < 900:
+                self.bossDamage += 10
+        if self.levelNumber % 10 == 0:
+            if self.levelNumber <= 30:
+                self.minXLength += 1
+                self.maxXlength += 2
+                self.minYLength += 1
+                self.maxYlength += 2
+                self.roomNumberMin += 1
+                self.maxFollowDistance += 1
+            if self.levelNumber <= 20:
+                self.bossMinXLength -= 1
+                self.bossMaxXlength -= 1
+                self.bossMinYLength -= 1
+                self.bossMaxYlength -= 1
+                self.minNumberMines += 1
+                self.maxNumberMines += 1
+        if self.levelNumber % 5 == 0:
+            if self.levelNumber <= 30:
+                self.hallWayRandomMove += 1
+                self.minNumberOfEnemies += 1
+                self.maxNumberOfEnemies += 1
+                self.findMinNumberOfEnemies += 1
+                self.findMaxNumberOfEnemies += 1
+            if self.levelNumber <= 5:
+                self.minHallwayLength -= 1
+            if self.levelNumber <= 10:
+                self.minNumberTraps -= 1
+                self.maxNumberTraps -= 1
+                self.clickAmount -= 1
+        if self.levelNumber == 15:
+            self.spawningTraps = False
+            self.minNumberHealthPack -= 1
+            self.maxNumberHealthPack -= 1
+            self.minNumberDamagePack -= 1
+            self.maxNumberDamagePack -= 1
+        if self.levelNumber == 30:
+            self.maxNumberHealthPack -= 1
+            self.maxNumberDamagePack -= 1
+
+
+
+        # Enemy Config
+    def reset(self):
+        self.minXLength = 4
+        self.maxXlength = 8
+        self.minYLength = 4
+        self.maxYlength = 8
+        self.roomNumberMin = 6
+        self.roomNumberMax = 10
+        self.bossMinXLength = 11
+        self.bossMaxXlength = 13
+        self.bossMinYLength = 11
+        self.bossMaxYlength = 13
+        self.bossRoomNumberMin = 3
+        self.bossRoomNumberMax = 4
+        self.hallWayRandomMove = 1
+        self.minHallwayLength = 4
+        self.chanceOfDoubleHallway = 0
+        self.roomGap = 2
+        # Collectables
+        self.minNumberHealthPack = 2
+        self.maxNumberHealthPack = 3
+        self.minNumberDamagePack = 2
+        self.maxNumberDamagePack = 3
+        self.minNumberMines = 2
+        self.maxNumberMines = 3
+        self.minNumberTraps = 3
+        self.maxNumberTraps = 5
+        self.clickAmount = 3
+        self.clickAmount2 = 1
+        # Enemy Config
+        self.maxFollowDistance = 10
+        self.minNumberOfEnemies = 6
+        self.maxNumberOfEnemies = 10
+        self.bossMinNumberOfEnemies = 2
+        self.bossMaxNumberOfEnemies = 4
+        self.findMinNumberOfEnemies = 5
+        self.findMaxNumberOfEnemies = 7
+        self.minEnemyDamage = 10
+        self.maxEnemyDamage = 30
+        self.minEnemyHealth = 30
+        self.maxEnemyHealth = 50
+        self.bossHealth = 280
+        self.bossDamage = 10
+        self.levelNumber = 0
+        self.spawningTraps = True
+
+
 
 
 
