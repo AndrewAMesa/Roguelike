@@ -62,7 +62,7 @@ class tile(Sprite):
         self.image = self.laserImage
         spriteGroup = spritecollide(self, enemyGroup, False)
         for x in range(len(spriteGroup)):
-            spriteGroup[x].health -= 40
+            spriteGroup[x].health -= 1000
             if spriteGroup[x].health <= 0:
                 spriteGroup[x].kill()
 class Enemy(Sprite):
@@ -937,6 +937,7 @@ class main():
             self.milliseconds += self.fpsClock.tick_busy_loop(60)
             self.buttonTick += self.fpsClock.tick_busy_loop(60)
     def createBoard(self):
+        quitEarly = False
         originalRandom = self.hallWayRandomMove
         self.tileList = [[0] * self.BOARDWIDTH for x in range(self.BOARDHEIGHT)]
         tempTop = 0 - self.TILESIZE
@@ -994,6 +995,10 @@ class main():
                         if self.tileList[y][x].isFloor or self.tileList[y - self.roomGap][x].isFloor or self.tileList[y + self.roomGap][x].isFloor or self.tileList[y][x - self.roomGap].isFloor or self.tileList[y][x + self.roomGap].isFloor:
                             tempCheck = True
                             tempNumber += 1
+                            if tempNumber == 3:
+                                roomAmount -= 1
+                                tempNumber = 0
+                                quitEarly = True
                             break
                     if tempCheck == True:
                         break
@@ -1014,9 +1019,6 @@ class main():
                                 self.centerArrayNumber += 1
                                 self.tileList[y][x].isBossStart = True
                     roomAmount -= 1
-                if tempNumber >= 3:
-                    roomAmount -= 1
-                    tempNumber = 0
         tempNumber = 1
         check1 = True
         while self.centerArrayNumber > 0:
@@ -1121,7 +1123,7 @@ class main():
                 pointy = int(random.random()*self.BOARDHEIGHT)
                 for y in range(pointy, pointy + 1):
                     for x in range(pointx, pointx + 1):
-                        if self.tileList[y][x].isRoom == False or self.tileList[y][x].isBossStart == False or self.tileList[y][x].isPlayer == True or self.tileList[y][x].isEnemy == True or self.tileList[y][x].isWall == True:
+                        if self.tileList[y][x].isRoom == False or self.tileList[y][x].isBossStart == False or (self.tileList[y][x].isPlayer == True and quitEarly == False) or self.tileList[y][x].isEnemy == True or self.tileList[y][x].isWall == True:
                             tempCheck = True
                 if tempCheck == False:
                     break
@@ -1130,6 +1132,7 @@ class main():
             self.tileList[pointy][pointx].isChanged = True
             self.bossSprite = tempEnemy
             self.enemyGroup.add(tempEnemy)
+
         while True:
             if self.gameMode == "BOSS":
                 enemyMax = self.bossMaxNumberOfEnemies
@@ -1143,6 +1146,7 @@ class main():
             numberOfEnemies = int(random.random() * enemyMax + 1)
             if numberOfEnemies >= enemyMin and numberOfEnemies <= enemyMax:
                 break
+        tempCount = 0
         while numberOfEnemies > 0:
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
@@ -1160,6 +1164,11 @@ class main():
                 self.tileList[pointy][pointx].isChanged = True
                 self.enemyGroup.add(tempEnemy)
                 numberOfEnemies -= 1
+            else:
+                tempCount += 1
+                if tempCount == 50:
+                    tempCount = 0
+                    numberOfEnemies -= 1
         if self.gameMode == "PORTAL":
             while True:
                 self.playerSprite.health = 450
@@ -1182,6 +1191,7 @@ class main():
             numberOfPacks = int(random.random()*self.maxNumberHealthPack + 1)
             if numberOfPacks >= self.minNumberHealthPack and numberOfPacks <= self.maxNumberHealthPack:
                 break
+        tempCount = 0
         while numberOfPacks > 0:
             tempCheck = False
             pointx = int(random.random() * (self.BOARDWIDTH - 15)) + 7
@@ -1197,10 +1207,16 @@ class main():
                 self.tileList[pointy][pointx].isHealthPack = True
                 self.tileList[pointy][pointx].isChanged = True
                 numberOfPacks -= 1
+            else:
+                tempCount += 1
+                if tempCount == 50:
+                    tempCount = 0
+                    numberOfPacks -= 1
         while True:
             numberOfPacks = int(random.random()*self.maxNumberDamagePack + 1)
             if numberOfPacks >= self.minNumberDamagePack and numberOfPacks <= self.maxNumberDamagePack:
                 break
+        tempCount = 0
         while numberOfPacks > 0:
             tempCheck = False
             pointx = int(random.random() * (self.BOARDWIDTH - 15)) + 7
@@ -1216,10 +1232,16 @@ class main():
                 self.tileList[pointy][pointx].isDamageBuff = True
                 self.tileList[pointy][pointx].isChanged = True
                 numberOfPacks -= 1
+            else:
+                tempCount += 1
+                if tempCount == 50:
+                    tempCount = 0
+                    numberOfPacks -= 1
         while True:
             numberOfMines = int(random.random()*self.maxNumberMines + 1)
             if numberOfMines >= self.minNumberMines and numberOfMines <= self.maxNumberMines:
                 break
+        tempCount = 0
         while numberOfMines > 0:
             tempCheck = False
             pointx = int(random.random() * (self.BOARDWIDTH - 15)) + 7
@@ -1235,6 +1257,12 @@ class main():
                     self.tileList[pointy][pointx].isDamager = True
                     self.tileList[pointy][pointx].isChanged = True
                     numberOfMines -= 1
+            else:
+                tempCount += 1
+                if tempCount == 50:
+                    tempCount = 0
+                    numberOfMines -= 1
+        tempCount = 0
         if self.gameMode == "ENEMY" and self.spawningTraps == True:
             leave = False
             while leave == False:
@@ -1269,6 +1297,10 @@ class main():
                             self.sparkGroup.add(self.tileList[y][x])
                             numberofTraps -= 1
                     leave = True
+                else:
+                    tempCount += 1
+                    if tempCount == 50:
+                        break
         elif self.gameMode == "PORTAL" and self.spawningTraps == True:
             leave = False
             while leave == False:
@@ -1308,6 +1340,10 @@ class main():
                     self.sparkGroup.add(self.tileList[pointy][pointx - 1])
                     self.sparkGroup.add(self.tileList[pointy][pointx + 1])
                     leave = True
+                else:
+                    tempCount += 1
+                    if tempCount == 50:
+                        break
     def drawBoard(self):
         if self.dead == True:
             self.DISPLAYSURF.fill((0,0,0))
