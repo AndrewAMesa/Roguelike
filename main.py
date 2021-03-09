@@ -689,8 +689,6 @@ class Player(Sprite):
             (tempX, tempY) = self.rect.topleft
             self.laserX = tempX + 7
             self.laserY = tempY + 17
-
-
 class main():
     DISPLAYWIDTH = 15
     DISPLAYHEIGHT = 15
@@ -1558,10 +1556,6 @@ class main():
                 self.roomNumberMin += 1
                 self.maxFollowDistance += 1
             if self.levelNumber <= 20:
-                self.bossMinXLength -= 1
-                self.bossMaxXlength -= 1
-                self.bossMinYLength -= 1
-                self.bossMaxYlength -= 1
                 self.minNumberMines += 1
                 self.maxNumberMines += 1
         if self.levelNumber % 5 == 0:
@@ -1586,10 +1580,6 @@ class main():
         if self.levelNumber == 30:
             self.maxNumberHealthPack -= 1
             self.maxNumberDamagePack -= 1
-
-
-
-        # Enemy Config
     def reset(self):
         self.minXLength = 4
         self.maxXlength = 8
