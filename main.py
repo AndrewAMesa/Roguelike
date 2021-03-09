@@ -810,12 +810,12 @@ class main():
         while True:
             # Creating board
             while self.createdBoard == False:
-                tempCheck = int(random.random() * 5 + 1)
-                if tempCheck <= 3:
+                tempCheck = int(random.random() * 4 + 1)
+                if tempCheck <= 2:
                     self.gameMode = "ENEMY"
-                elif tempCheck <= 5:
+                elif tempCheck <= 4:
                     self.gameMode = "PORTAL"
-                if self.levelNumber == 5:
+                if self.levelNumber % 5 == 0:
                     self.gameMode = "BOSS"
                 print(self.gameMode)
                 self.createBoard()
@@ -867,6 +867,8 @@ class main():
                         sys.exit()
                     elif event.type == KEYDOWN:
                         if event.key == pygame.K_RETURN:
+                            if self.dead == True:
+                                self.levelNumber = 1
                             self.restart()
             #Updating board
             if self.playable == True:
@@ -903,7 +905,6 @@ class main():
                 self.drawBoard()
                 pygame.display.update()
                 if self.playerSprite.health <= 0 and self.playerSprite.attacking == False:
-                    self.levelNumber = 0
                     self.playable = False
                     self.dead = True
                     self.reset()
@@ -1350,7 +1351,7 @@ class main():
             self.healthObj = pygame.font.Font('freesansbold.ttf', 30)
             clockSurfaceObj = self.healthObj.render("Game Over!", True, (255, 255, 255))
             self.DISPLAYSURF.blit(clockSurfaceObj, (139, int(self.DISPLAYSURF.get_width()/2 - 50)))
-            clockSurfaceObj = self.healthObj.render("You made it to level " + str(self.levelNumber + 1), True, (255, 255, 255))
+            clockSurfaceObj = self.healthObj.render("You made it to level " + str(self.levelNumber), True, (255, 255, 255))
             self.DISPLAYSURF.blit(clockSurfaceObj, (73, int(self.DISPLAYSURF.get_width() / 2 - 15)))
             clockSurfaceObj = self.healthObj.render("Click Enter to Restart", True, (255, 255, 255))
             self.DISPLAYSURF.blit(clockSurfaceObj, (72, int(self.DISPLAYSURF.get_width() / 2 + 20)))
@@ -1631,7 +1632,6 @@ class main():
         self.maxEnemyHealth = 50
         self.bossHealth = 280
         self.bossDamage = 10
-        self.levelNumber = 0
         self.spawningTraps = True
 
 
