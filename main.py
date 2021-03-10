@@ -869,6 +869,11 @@ class main():
                             if self.dead == True:
                                 self.levelNumber = 1
                             self.restart()
+                    elif event.type == MOUSEBUTTONDOWN:
+                        if pygame.mouse.get_pressed(3) == (True, False, False):
+                            print("You cannot do that action now")
+                        if pygame.mouse.get_pressed(3) == (False, False, True):
+                            print("You cannot do that action now")
             #Updating board
             if self.playable == True:
                 self.move()
