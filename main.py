@@ -361,9 +361,10 @@ class Enemy(Sprite):
                 spriteGroup = spritecollide(self, backgroundGroup, False)
                 for x in range(len(spriteGroup)):
                     if spriteGroup[x].isWall == True:
-                        self.isStunned = True
+
                         self.rect.y += dirvect.y * -1
                         if self.randomlyMoving == False and self.repositioning == False:
+                            self.isStunned = True
                             personGroup = spritecollide(player, backgroundGroup, False)
                             tempCheck = False
                             for x in range(len(personGroup)):
@@ -390,9 +391,9 @@ class Enemy(Sprite):
                 spriteGroup = spritecollide(self, backgroundGroup, False)
                 for x in range(len(spriteGroup)):
                     if spriteGroup[x].isWall == True:
-                        self.isStunned = True
                         self.rect.x += dirvect.x * -1
                         if self.randomlyMoving == False and self.repositioning == False:
+                            self.isStunned = True
                             personGroup = spritecollide(player, backgroundGroup, False)
                             tempCheck = False
                             for x in range(len(personGroup)):
@@ -708,7 +709,7 @@ class main():
     canGoRight = False
     canGoLeft = False
     speed = .5
-    levelNumber = 1
+    levelNumber = 5
 
     #boolean
     createdBoard = False
@@ -1623,14 +1624,5 @@ class main():
         self.bossHealth = 280
         self.bossDamage = 10
         self.spawningTraps = True
-
-
-
-
-
-
-
-
-
 MainObject = main()
 MainObject.main()
