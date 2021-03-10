@@ -709,7 +709,7 @@ class main():
     canGoRight = False
     canGoLeft = False
     speed = .5
-    levelNumber = 5
+    levelNumber = 1
 
     #boolean
     createdBoard = False
