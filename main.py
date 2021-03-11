@@ -491,7 +491,7 @@ class Player(Sprite):
         self.permanentImage = _image
         self.rect = self.image.get_rect()
         self.rect.update(self.left, self.top, self.BOXSIZE, self.BOXSIZE)
-        self.direction = ""
+        self.direction = "UP"
         self.mousex = 0
         self.mousey = 0
         self.health = 999
@@ -628,22 +628,22 @@ class Player(Sprite):
             pygame.display.update()
     def findAttackDirection(self):
         dirvect = pygame.math.Vector2(self.mousex - self.DisplaySurf.get_width()/2, self.mousey -  self.DisplaySurf.get_height()/2)
-        if dirvect.x < 0 and dirvect.y < 0:
+        if dirvect.x <= 0 and dirvect.y <= 0:
             if abs(dirvect.x) > abs(dirvect.y):
                 self.direction = "LEFT"
             else:
                 self.direction = "UP"
-        elif dirvect.x > 0 and dirvect.y < 0:
+        elif dirvect.x >= 0 and dirvect.y <= 0:
             if abs(dirvect.x) > abs(dirvect.y):
                 self.direction = "RIGHT"
             else:
                 self.direction = "UP"
-        elif dirvect.x < 0 and dirvect.y > 0:
+        elif dirvect.x <= 0 and dirvect.y >= 0:
             if abs(dirvect.x) > abs(dirvect.y):
                 self.direction = "LEFT"
             else:
                 self.direction = "DOWN"
-        elif dirvect.x > 0 and dirvect.y > 0:
+        elif dirvect.x >= 0 and dirvect.y >= 0:
             if abs(dirvect.x) > abs(dirvect.y):
                 self.direction = "RIGHT"
             else:
@@ -724,6 +724,7 @@ class main():
     onButton = False
     spawningTraps = True
     buttonTick = 0
+    moved = False
 
     #player
     player = ""
@@ -874,6 +875,7 @@ class main():
                             print("You cannot do that action now")
                         if pygame.mouse.get_pressed(3) == (False, False, True):
                             print("You cannot do that action now")
+
             #Updating board
             if self.playable == True:
                 self.move()
@@ -1000,13 +1002,11 @@ class main():
                         if self.tileList[y][x].isFloor or self.tileList[y - self.roomGap][x].isFloor or self.tileList[y + self.roomGap][x].isFloor or self.tileList[y][x - self.roomGap].isFloor or self.tileList[y][x + self.roomGap].isFloor:
                             tempCheck = True
                             tempNumber += 1
-                            if tempNumber == 3:
+                            if tempNumber >= 20:
                                 roomAmount -= 1
                                 tempNumber = 0
                                 quitEarly = True
                             break
-                    if tempCheck == True:
-                        break
                 if tempCheck == False:
                     yLegnth = int ((yEnd - yStart) * .5) + 1
                     xLength = int ((xEnd - xStart) * .5) + 1
@@ -1306,7 +1306,7 @@ class main():
                     leave = True
                 else:
                     tempCount += 1
-                    if tempCount >= 50:
+                    if tempCount >= 70:
                         break
         elif self.gameMode == "PORTAL" and self.spawningTraps == True:
             leave = False
@@ -1349,7 +1349,7 @@ class main():
                     leave = True
                 else:
                     tempCount += 1
-                    if tempCount >= 50:
+                    if tempCount >= 70:
                         break
     def drawBoard(self):
         if self.dead == True:
