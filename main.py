@@ -1152,6 +1152,7 @@ class main():
             if numberOfEnemies >= enemyMin and numberOfEnemies <= enemyMax:
                 break
         tempCount = 0
+        placedEnemy = False
         while numberOfEnemies > 0:
             pointx = int(random.random()*self.BOARDWIDTH)
             pointy = int(random.random()*self.BOARDHEIGHT)
@@ -1169,9 +1170,10 @@ class main():
                 self.tileList[pointy][pointx].isChanged = True
                 self.enemyGroup.add(tempEnemy)
                 numberOfEnemies -= 1
+                placedEnemy = True
             else:
                 tempCount += 1
-                if tempCount == 50:
+                if tempCount >= 50 and placedEnemy == True:
                     tempCount = 0
                     numberOfEnemies -= 1
         if self.gameMode == "PORTAL":
@@ -1214,7 +1216,7 @@ class main():
                 numberOfPacks -= 1
             else:
                 tempCount += 1
-                if tempCount == 50:
+                if tempCount >= 50:
                     tempCount = 0
                     numberOfPacks -= 1
         while True:
@@ -1239,7 +1241,7 @@ class main():
                 numberOfPacks -= 1
             else:
                 tempCount += 1
-                if tempCount == 50:
+                if tempCount >= 50:
                     tempCount = 0
                     numberOfPacks -= 1
         while True:
@@ -1264,7 +1266,7 @@ class main():
                     numberOfMines -= 1
             else:
                 tempCount += 1
-                if tempCount == 50:
+                if tempCount >= 50:
                     tempCount = 0
                     numberOfMines -= 1
         tempCount = 0
@@ -1304,7 +1306,7 @@ class main():
                     leave = True
                 else:
                     tempCount += 1
-                    if tempCount == 50:
+                    if tempCount >= 50:
                         break
         elif self.gameMode == "PORTAL" and self.spawningTraps == True:
             leave = False
@@ -1347,7 +1349,7 @@ class main():
                     leave = True
                 else:
                     tempCount += 1
-                    if tempCount == 50:
+                    if tempCount >= 50:
                         break
     def drawBoard(self):
         if self.dead == True:
@@ -1554,12 +1556,7 @@ class main():
             if self.bossDamage < 900:
                 self.bossDamage += 10
         if self.levelNumber % 10 == 0:
-            if self.levelNumber <= 30:
-                self.minXLength += 1
-                self.maxXlength += 2
-                self.minYLength += 1
-                self.maxYlength += 2
-                self.roomNumberMin += 1
+            if self.levelNumber <= 40:
                 self.maxFollowDistance += 1
             if self.levelNumber <= 20:
                 self.minNumberMines += 1
