@@ -1,2 +1,29 @@
 # Roguelike
-This is a roguelike game developed using the Python programming language and Pygame. Procedural generation is used to produce unique levels. The point of this game is to see how many levels you can last until you lose by running out of health. To move on to the next level you will be given one out of three tasks. These are to find either a portal, defeat enough enemies, or defeat a boss which appears every five levels. In the portal level your health will be lowered to 450, and in a boss level you cannot sprint. To harm the boss you need to stun it by making it charge against a wall. WASD or arrow keys will move the player, and shift will have the player sprint for a short amount of time. Left-click activates your swords, and right-click fires your gun. You gain one projectile for every five hits with the sword. The player points to wherever your cursor is on the screen. There are collectibles to heal and increase damage, traps to set off, and tiles that hurt you. There is a very rare position you can get enemies in which some enemies will stop chasing you, but moving around will get them to chase you again (bug).
+
+This is a roguelike game developed using Python and Pygame, featuring procedural generation to produce unique levels. The goal is to see how many levels you can survive until you lose by running out of health.
+
+## Gameplay
+
+To progress to the next level, you will be assigned one of three tasks:
+1. **Find a Portal:** Upon finding it (in portal levels, your health is lowered).
+2. **Defeat Enemies:** A certain number of enemies need to be defeated to proceed.
+3. **Defeat a Boss:** Every five levels, you’ll face a boss. In this level, sprinting is disabled, and to damage the boss, you must stun it by making it charge into a wall.
+
+### Controls
+
+- **Movement:** `W`, `A`, `S`, `D` or Arrow keys
+- **Sprint:** `Shift` (limited duration)
+- **Attack:** 
+  - **Sword:** Left-click
+  - **Gun:** Right-click (you gain one projectile every five sword hits)
+
+The player will face the cursor’s direction on the screen.
+
+### Features
+
+- **Collectibles:** Heal or increase your damage.
+- **Traps and Tiles:** Some tiles will hurt you; others are traps you can set off.
+
+## Known Issues
+
+- **Enemy Pathfinding Bug:** In rare positions, some enemies may temporarily stop chasing you.
